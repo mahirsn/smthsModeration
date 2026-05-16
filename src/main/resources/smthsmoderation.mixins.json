@@ -1,0 +1,8 @@
+{
+    "required": true,
+    "package": "com.smthsmoderation.mixin",
+    "compatibilityLevel": "JAVA_21",
+    "client": [
+        "ChatScreenMixin"
+    ]
+}

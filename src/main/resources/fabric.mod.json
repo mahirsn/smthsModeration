@@ -1,0 +1,36 @@
+{
+    "schemaVersion": 1,
+    "id": "smthsmoderation",
+    "version": "${version}",
+    "name": "Smthsmoderation",
+    "description": "Highly Customizable Command Executer (designed for moderation)",
+    "authors": [
+        "smthsmoderation"
+    ],
+    "contact": {},
+    "license": "MIT",
+    "icon": "assets/smthsmoderation/logo.png",
+    "environment": "*",
+    "entrypoints": {
+        "main": [
+            "com.smthsmoderation.SmthsmoderationMod"
+        ],
+        "client": [
+            "com.smthsmoderation.SmthsmoderationModClient"
+        ],
+        "modmenu": [
+            "com.smthsmoderation.config.ModMenuIntegration"
+        ]
+    },
+    "mixins": [
+        "smthsmoderation.mixins.json"
+    ],
+    "depends": {
+        "fabricloader": ">=0.16.0",
+        "minecraft": "~1.21.11",
+        "java": ">=21",
+        "fabric-api": "*",
+        "owo": ">=0.13.0",
+        "cloth-config2": ">=21.11.153"
+    }
+}

@@ -1,0 +1,12 @@
+.gradle/
+build/
+*.jar
+*.ipr
+*.iws
+*.iml
+.gradle/
+local.properties
+.idea/
+.vscode/
+*.log
+run/
