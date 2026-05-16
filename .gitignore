@@ -10,3 +10,7 @@ local.properties
 .vscode/
 *.log
 run/
+*.jpg
+*.png
+referance/
+!/src/main/resources/assets/smthsmoderation/logo.png
