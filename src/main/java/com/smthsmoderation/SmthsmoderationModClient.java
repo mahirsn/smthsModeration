@@ -8,6 +8,7 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
@@ -28,6 +29,7 @@ public class SmthsmoderationModClient implements ClientModInitializer {
         registerKeybind();
         registerShiftClickHandler();
         registerCommands();
+        registerHistoryInterceptor();
     }
 
     private void registerKeybind() {
@@ -81,6 +83,14 @@ public class SmthsmoderationModClient implements ClientModInitializer {
                     return 1;
                 })
             );
+        });
+    }
+
+    private void registerHistoryInterceptor() {
+        ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
+            if (!overlay) {
+                ModerationScreen.appendHistoryLine(message);
+            }
         });
     }
 }

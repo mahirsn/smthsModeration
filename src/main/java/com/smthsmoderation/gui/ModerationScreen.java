@@ -4,12 +4,13 @@ import com.smthsmoderation.config.ActionsManager;
 import com.smthsmoderation.config.CommandVariable;
 import com.smthsmoderation.config.ModerationAction;
 import com.smthsmoderation.util.GuiUtil;
-import com.smthsmoderation.util.HistoryTracker;
 import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
+import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.TextBoxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
+import io.wispforest.owo.ui.container.ScrollContainer;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.core.*;
 import net.minecraft.client.MinecraftClient;
@@ -25,19 +26,26 @@ import java.util.regex.Pattern;
 
 public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
 
+    private static ModerationScreen instance;
+
     private final String playerName;
     private final Identifier skinTexture;
     private final List<ModerationAction> configActions = new ArrayList<>();
     private int selectedIndex = -1;
 
     private FlowLayout panel;
+    private FlowLayout leftColumn;
+    private FlowLayout rightColumn;
     private ModerationAction currentAction;
     private ButtonComponent executeBtn;
     private FlowLayout confirmRow;
     private FlowLayout variablesSection;
     private FlowLayout previewSection;
     private FlowLayout historyContent;
+    private ScrollContainer<FlowLayout> historyLogScroll;
+    private FlowLayout historyLogContent;
     private boolean showingConfirmation = false;
+    private boolean isAwaitingHistory = false;
 
     private final Map<String, TextBoxComponent> varFields = new HashMap<>();
     private final List<ButtonComponent> actionButtons = new ArrayList<>();
@@ -45,7 +53,15 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
     public ModerationScreen(String playerName, Identifier skinTexture) {
         this.playerName = playerName;
         this.skinTexture = skinTexture;
+        instance = this;
         loadActions();
+    }
+
+    @Override
+    public void close() {
+        isAwaitingHistory = false;
+        instance = null;
+        super.close();
     }
 
     private void loadActions() {
@@ -68,26 +84,42 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         root.surface(Surface.VANILLA_TRANSLUCENT);
         root.alignment(HorizontalAlignment.CENTER, VerticalAlignment.CENTER);
 
-        panel = UIContainers.verticalFlow(Sizing.fixed(320), Sizing.content());
-        panel.surface(Surface.flat(GuiUtil.PANEL_BG));
-        panel.padding(Insets.of(12));
-        panel.gap(6);
+        panel = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
+        panel.gap(12);
 
-        buildHeader(panel);
-        buildActionButtons(panel);
+        leftColumn = UIContainers.verticalFlow(Sizing.fixed(220), Sizing.content());
+        leftColumn.surface(Surface.flat(GuiUtil.PANEL_BG));
+        leftColumn.padding(Insets.of(12));
+        leftColumn.gap(6);
 
-        buildVariableFields(panel);
+        buildHeader(leftColumn);
+        buildActionButtons(leftColumn);
+        buildVariableFields(leftColumn);
 
         previewSection = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
-        panel.child(previewSection);
+        leftColumn.child(previewSection);
 
         confirmRow = createConfirmRow();
-        buildExecuteButton(panel);
-        buildHistoryButton(panel);
+        buildExecuteButton(leftColumn);
+        buildHistoryButton(leftColumn);
 
         historyContent = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
         historyContent.gap(2);
-        panel.child(historyContent);
+        leftColumn.child(historyContent);
+
+        rightColumn = UIContainers.verticalFlow(Sizing.fixed(220), Sizing.fill(100));
+        rightColumn.surface(Surface.flat(GuiUtil.PANEL_BG));
+        rightColumn.padding(Insets.of(12));
+        rightColumn.gap(4);
+        rightColumn.child(UIComponents.label(Text.literal("§6§lHistory")));
+
+        historyLogContent = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
+        historyLogContent.gap(2);
+        historyLogScroll = UIContainers.verticalScroll(Sizing.fixed(220), Sizing.fill(100), historyLogContent);
+        rightColumn.child(historyLogScroll);
+
+        panel.child(leftColumn);
+        panel.child(rightColumn);
 
         root.child(panel);
         refreshVariables();
@@ -287,6 +319,9 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         ButtonComponent historyBtn = UIComponents.button(
             Text.literal("§7Show History"),
             b -> {
+                isAwaitingHistory = true;
+                historyLogContent.clearChildren();
+                historyLogContent.child(UIComponents.label(Text.literal("§7Fetching history for §f" + playerName + "...")));
                 MinecraftClient client = MinecraftClient.getInstance();
                 if (client.getNetworkHandler() != null) {
                     client.getNetworkHandler().sendChatCommand("history " + playerName + " " + ActionsManager.historyCommandLimit);
@@ -297,6 +332,12 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         historyBtn.sizing(Sizing.fill(), Sizing.fixed(20));
         historyBtn.tooltip(Text.literal("§7View LiteBans history for §f" + playerName));
         panel.child(historyBtn);
+    }
+
+    public static void appendHistoryLine(Text message) {
+        if (instance != null && instance.isAwaitingHistory && instance.historyLogContent != null) {
+            instance.historyLogContent.child(UIComponents.label(message).maxWidth(200));
+        }
     }
 
     private void updateExecuteButton() {
@@ -316,13 +357,13 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         if (showingConfirmation) {
             executeBtn.active = false;
             if (!confirmRow.hasParent()) {
-                int idx = panel.children().indexOf(executeBtn);
-                if (idx >= 0) panel.child(idx, confirmRow);
+                int idx = leftColumn.children().indexOf(executeBtn);
+                if (idx >= 0) leftColumn.child(idx, confirmRow);
             }
         } else {
             executeBtn.active = canExecute;
             if (confirmRow.hasParent()) {
-                panel.removeChild(confirmRow);
+                leftColumn.removeChild(confirmRow);
             }
         }
     }
@@ -345,17 +386,5 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         MinecraftClient.getInstance().player.networkHandler.sendChatCommand(
             command.startsWith("/") ? command.substring(1) : command
         );
-    }
-
-    private void refreshHistory() {
-        historyContent.clearChildren();
-        var entries = HistoryTracker.getHistory(playerName);
-        if (entries.isEmpty()) {
-            historyContent.child(UIComponents.label(Text.literal("§8No history data yet")));
-        } else {
-            for (int i = Math.max(0, entries.size() - 10); i < entries.size(); i++) {
-                historyContent.child(UIComponents.label(Text.literal(entries.get(i).formatted())));
-            }
-        }
     }
 }
