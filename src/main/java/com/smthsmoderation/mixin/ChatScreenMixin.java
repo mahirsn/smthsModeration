@@ -1,5 +1,6 @@
 package com.smthsmoderation.mixin;
 
+import com.smthsmoderation.config.ActionsManager;
 import com.smthsmoderation.gui.ModerationScreen;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ChatScreen;
@@ -19,7 +20,7 @@ public class ChatScreenMixin {
 
     @Inject(method = "handleClickEvent", at = @At("HEAD"), cancellable = true)
     private void onHandleClickEvent(Style style, boolean something, CallbackInfoReturnable<Boolean> cir) {
-        if (!isShiftDown()) return;
+        if (!ActionsManager.modEnabled || !ActionsManager.enableChatClick || !isShiftDown()) return;
 
         String name = extractPlayerName(style);
         if (name != null && !name.isEmpty()) {

@@ -45,8 +45,10 @@ public class ModerationAction {
         return type.toUpperCase();
     }
 
+    private static final int DEFAULT_COLOR = 0xFFAAAAAA;
+
     public int getColor() {
-        return buttonColor;
+        return buttonColor != 0 ? buttonColor : DEFAULT_COLOR;
     }
 
     public int getHoverColor() {

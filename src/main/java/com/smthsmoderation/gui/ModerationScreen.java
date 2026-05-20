@@ -118,6 +118,7 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
 
         var actionFlow = UIContainers.ltrTextFlow(Sizing.fill(100), Sizing.content());
         actionFlow.gap(4);
+        actionFlow.margins(Insets.vertical(2));
 
         actionButtons.clear();
         for (int i = 0; i < configActions.size(); i++) {
@@ -281,12 +282,16 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     private void buildHistoryButton(FlowLayout panel) {
+        if (!ActionsManager.showHistoryButton) return;
         ButtonComponent historyBtn = UIComponents.button(
             Text.literal("§7Show History"),
-            b -> refreshHistory()
+            b -> {
+                refreshHistory();
+            }
         );
         historyBtn.renderer(GuiUtil.modernButton(GuiUtil.DARK_BG, GuiUtil.DARK_BG_HOVER, GuiUtil.DISABLED));
         historyBtn.sizing(Sizing.fill(), Sizing.fixed(20));
+        historyBtn.tooltip(Text.literal("§7View moderation history for §f" + playerName));
         panel.child(historyBtn);
     }
 

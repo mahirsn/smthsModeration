@@ -15,11 +15,25 @@ import java.util.List;
 public class ActionsManager {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path ACTIONS_PATH = Path.of("config", "smthsmoderation_actions.json");
+    private static final Path CONFIG_PATH = Path.of("config", "smthsmoderation_config.json");
     public static final Type LIST_TYPE = new TypeToken<List<ModerationAction>>(){}.getType();
+    public static final Type CONFIG_TYPE = new TypeToken<ModConfig>(){}.getType();
 
     public static List<ModerationAction> actions = new ArrayList<>();
+    public static boolean modEnabled = true;
+    public static boolean enableEntityClick = true;
+    public static boolean enableChatClick = true;
+    public static boolean showHistoryButton = true;
+
+    public static class ModConfig {
+        public boolean modEnabled = true;
+        public boolean enableEntityClick = true;
+        public boolean enableChatClick = true;
+        public boolean showHistoryButton = true;
+    }
 
     public static void load() {
+        loadConfig();
         try {
             if (Files.exists(ACTIONS_PATH)) {
                 String json = Files.readString(ACTIONS_PATH);
@@ -32,6 +46,38 @@ public class ActionsManager {
         } catch (Exception ignored) {}
         actions = createDefaults();
         save();
+    }
+
+    private static void loadConfig() {
+        try {
+            if (Files.exists(CONFIG_PATH)) {
+                String json = Files.readString(CONFIG_PATH);
+                ModConfig cfg = GSON.fromJson(json, CONFIG_TYPE);
+                if (cfg != null) {
+                    modEnabled = cfg.modEnabled;
+                    enableEntityClick = cfg.enableEntityClick;
+                    enableChatClick = cfg.enableChatClick;
+                    showHistoryButton = cfg.showHistoryButton;
+                    return;
+                }
+            }
+        } catch (Exception ignored) {}
+        modEnabled = true;
+        enableEntityClick = true;
+        enableChatClick = true;
+        showHistoryButton = true;
+    }
+
+    public static void saveConfig() {
+        try {
+            Files.createDirectories(CONFIG_PATH.getParent());
+            ModConfig cfg = new ModConfig();
+            cfg.modEnabled = modEnabled;
+            cfg.enableEntityClick = enableEntityClick;
+            cfg.enableChatClick = enableChatClick;
+            cfg.showHistoryButton = showHistoryButton;
+            Files.writeString(CONFIG_PATH, GSON.toJson(cfg));
+        } catch (IOException ignored) {}
     }
 
     private static List<ModerationAction> createDefaults() {

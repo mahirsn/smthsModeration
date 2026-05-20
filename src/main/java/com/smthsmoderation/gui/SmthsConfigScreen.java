@@ -34,6 +34,42 @@ public class SmthsConfigScreen {
         ConfigCategory main = builder.getOrCreateCategory(Text.literal("Moderation Actions"));
 
         main.addEntry(ConfigEntryBuilder.create()
+            .startBooleanToggle(Text.literal("§6§lEnable Mod"), ActionsManager.modEnabled)
+            .setDefaultValue(true)
+            .setSaveConsumer(v -> {
+                ActionsManager.modEnabled = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        main.addEntry(ConfigEntryBuilder.create()
+            .startBooleanToggle(Text.literal("§fEnable Shift+Right-Click on Players"), ActionsManager.enableEntityClick)
+            .setDefaultValue(true)
+            .setSaveConsumer(v -> {
+                ActionsManager.enableEntityClick = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        main.addEntry(ConfigEntryBuilder.create()
+            .startBooleanToggle(Text.literal("§fEnable Shift+Left-Click in Chat"), ActionsManager.enableChatClick)
+            .setDefaultValue(true)
+            .setSaveConsumer(v -> {
+                ActionsManager.enableChatClick = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        main.addEntry(ConfigEntryBuilder.create()
+            .startBooleanToggle(Text.literal("§fShow History Button"), ActionsManager.showHistoryButton)
+            .setDefaultValue(true)
+            .setSaveConsumer(v -> {
+                ActionsManager.showHistoryButton = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        main.addEntry(ConfigEntryBuilder.create()
             .startTextDescription(Text.literal("§7Highly Customizable Command Executer (designed for moderation)"))
             .build());
 
