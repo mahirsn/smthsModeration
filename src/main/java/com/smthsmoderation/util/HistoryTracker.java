@@ -9,7 +9,7 @@ public class HistoryTracker {
 
     private static final Map<String, List<HistoryEntry>> history = new LinkedHashMap<>();
     private static final Pattern MOD_ACTION = Pattern.compile(
-        "(?i)(?:\\[.+?\\]\\s*)?(\\w{3,16})\\s+(?:was\\s+)?(?:permanently\\s+|temporarily\\s+)?(banned|kicked|warned|muted|tempbanned|tempmuted)" +
+        "(?i)(?:\\[.+?\\]\\s*)?(\\w{3,16})\\s+(?:was\\s+)?(?:permanently\\s+|temporarily\\s+)?(banned|kicked|warned|muted|tempbanned|tempmuted|teleported|invsee|tp(?:ed|hered)?)" +
         "(?:\\s+(?:by|from)\\s+(?:the\\s+)?(?:server\\s+)?(\\w{3,16}))?" +
         "(?:\\s+(?:for|reason[.:]?)\\s+(.+))?"
     );

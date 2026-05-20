@@ -9,7 +9,7 @@
     ],
     "contact": {},
     "license": "MIT",
-    "icon": "assets/smthsmoderation/logo.png",
+    "icon": "assets/smthsmoderation/icon.png",
     "environment": "*",
     "entrypoints": {
         "main": [

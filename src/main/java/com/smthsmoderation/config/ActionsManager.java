@@ -24,12 +24,14 @@ public class ActionsManager {
     public static boolean enableEntityClick = true;
     public static boolean enableChatClick = true;
     public static boolean showHistoryButton = true;
+    public static int historyCommandLimit = 10;
 
     public static class ModConfig {
         public boolean modEnabled = true;
         public boolean enableEntityClick = true;
         public boolean enableChatClick = true;
         public boolean showHistoryButton = true;
+        public int historyCommandLimit = 10;
     }
 
     public static void load() {
@@ -58,6 +60,7 @@ public class ActionsManager {
                     enableEntityClick = cfg.enableEntityClick;
                     enableChatClick = cfg.enableChatClick;
                     showHistoryButton = cfg.showHistoryButton;
+                    historyCommandLimit = cfg.historyCommandLimit;
                     return;
                 }
             }
@@ -66,6 +69,7 @@ public class ActionsManager {
         enableEntityClick = true;
         enableChatClick = true;
         showHistoryButton = true;
+        historyCommandLimit = 10;
     }
 
     public static void saveConfig() {
@@ -76,6 +80,7 @@ public class ActionsManager {
             cfg.enableEntityClick = enableEntityClick;
             cfg.enableChatClick = enableChatClick;
             cfg.showHistoryButton = showHistoryButton;
+            cfg.historyCommandLimit = historyCommandLimit;
             Files.writeString(CONFIG_PATH, GSON.toJson(cfg));
         } catch (IOException ignored) {}
     }

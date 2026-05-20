@@ -3,20 +3,16 @@ package com.smthsmoderation;
 import com.smthsmoderation.config.ActionsManager;
 import com.smthsmoderation.gui.ModerationScreen;
 import com.smthsmoderation.gui.PlayerSelectorScreen;
-import com.smthsmoderation.util.HistoryTracker;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
-import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Identifier;
 import static net.minecraft.util.Identifier.of;
@@ -32,7 +28,6 @@ public class SmthsmoderationModClient implements ClientModInitializer {
         registerKeybind();
         registerShiftClickHandler();
         registerCommands();
-        registerHistoryInterceptor();
     }
 
     private void registerKeybind() {
@@ -86,38 +81,6 @@ public class SmthsmoderationModClient implements ClientModInitializer {
                     return 1;
                 })
             );
-
-            dispatcher.register(ClientCommandManager.literal("history")
-                .executes(this::executeHistory)
-            );
-        });
-    }
-
-    private int executeHistory(com.mojang.brigadier.context.CommandContext<FabricClientCommandSource> ctx) {
-        if (!ActionsManager.modEnabled) return 0;
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null) return 0;
-
-        var entries = HistoryTracker.getAllEntries();
-        if (entries.isEmpty()) {
-            client.player.sendMessage(Text.literal("§8[SmthsModeration] §7No moderation history recorded yet."), false);
-            return 1;
-        }
-
-        client.player.sendMessage(Text.literal("§8[SmthsModeration] §6=== Moderation History ==="), false);
-        int count = Math.min(entries.size(), 20);
-        for (int i = entries.size() - count; i < entries.size(); i++) {
-            client.player.sendMessage(Text.literal("§8[SmthsModeration] §f" + entries.get(i).formatted()), false);
-        }
-        client.player.sendMessage(Text.literal("§8[SmthsModeration] §6========================"), false);
-        return 1;
-    }
-
-    private void registerHistoryInterceptor() {
-        ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
-            if (!overlay) {
-                HistoryTracker.onChatMessage(message.getString());
-            }
         });
     }
 }

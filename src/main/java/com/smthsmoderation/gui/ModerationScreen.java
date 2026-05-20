@@ -136,6 +136,7 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
             var tr = MinecraftClient.getInstance().textRenderer;
             int btnW = tr.getWidth(Text.literal(action.type)) + 12;
             btn.sizing(Sizing.fixed(btnW), Sizing.fixed(20));
+            btn.margins(Insets.of(2));
 
             if (action.description != null && !action.description.isEmpty()) {
                 btn.tooltip(Text.literal(action.description));
@@ -286,12 +287,15 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         ButtonComponent historyBtn = UIComponents.button(
             Text.literal("§7Show History"),
             b -> {
-                refreshHistory();
+                MinecraftClient client = MinecraftClient.getInstance();
+                if (client.getNetworkHandler() != null) {
+                    client.getNetworkHandler().sendChatCommand("history " + playerName + " " + ActionsManager.historyCommandLimit);
+                }
             }
         );
         historyBtn.renderer(GuiUtil.modernButton(GuiUtil.DARK_BG, GuiUtil.DARK_BG_HOVER, GuiUtil.DISABLED));
         historyBtn.sizing(Sizing.fill(), Sizing.fixed(20));
-        historyBtn.tooltip(Text.literal("§7View moderation history for §f" + playerName));
+        historyBtn.tooltip(Text.literal("§7View LiteBans history for §f" + playerName));
         panel.child(historyBtn);
     }
 

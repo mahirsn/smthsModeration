@@ -70,6 +70,17 @@ public class SmthsConfigScreen {
             .build());
 
         main.addEntry(ConfigEntryBuilder.create()
+            .startIntField(Text.literal("§fHistory Command Limit"), ActionsManager.historyCommandLimit)
+            .setDefaultValue(10)
+            .setMin(1)
+            .setMax(100)
+            .setSaveConsumer(v -> {
+                ActionsManager.historyCommandLimit = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        main.addEntry(ConfigEntryBuilder.create()
             .startTextDescription(Text.literal("§7Highly Customizable Command Executer (designed for moderation)"))
             .build());
 
