@@ -107,7 +107,7 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         historyContent.gap(2);
         leftColumn.child(historyContent);
 
-        rightColumn = UIContainers.verticalFlow(Sizing.fixed(220), Sizing.fill(100));
+        rightColumn = UIContainers.verticalFlow(Sizing.fixed(220), Sizing.content());
         rightColumn.surface(Surface.flat(GuiUtil.PANEL_BG));
         rightColumn.padding(Insets.of(12));
         rightColumn.gap(4);
@@ -115,7 +115,7 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
 
         historyLogContent = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
         historyLogContent.gap(2);
-        historyLogScroll = UIContainers.verticalScroll(Sizing.fixed(220), Sizing.fill(100), historyLogContent);
+        historyLogScroll = UIContainers.verticalScroll(Sizing.fill(), Sizing.fixed(180), historyLogContent);
         rightColumn.child(historyLogScroll);
 
         panel.child(leftColumn);
