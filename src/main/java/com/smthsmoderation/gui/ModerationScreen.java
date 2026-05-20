@@ -336,6 +336,8 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
 
     public static void appendHistoryLine(Text message) {
         if (instance != null && instance.isAwaitingHistory && instance.historyLogContent != null) {
+            String raw = message.getString().trim();
+            if (!raw.startsWith("➩")) return;
             instance.historyLogContent.child(UIComponents.label(message).maxWidth(200));
         }
     }

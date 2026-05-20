@@ -88,9 +88,8 @@ public class SmthsmoderationModClient implements ClientModInitializer {
 
     private void registerHistoryInterceptor() {
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
-            if (!overlay) {
-                ModerationScreen.appendHistoryLine(message);
-            }
+            if (!overlay && !message.getString().trim().startsWith("➩")) return;
+            ModerationScreen.appendHistoryLine(message);
         });
     }
 }
