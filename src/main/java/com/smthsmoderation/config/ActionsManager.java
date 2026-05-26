@@ -88,31 +88,39 @@ public class ActionsManager {
     private static List<ModerationAction> createDefaults() {
         List<ModerationAction> list = new ArrayList<>();
 
-        ModerationAction ban = new ModerationAction("ban", "/ban %player% %duration% %reason%", 0xFF780FC6, "Oyuncuyu sunucudan uzaklaştırır.");
+        ModerationAction ban = new ModerationAction("ban", "/ban %player% %duration% %reason%", 0xFFFF5555, "Oyuncuyu sunucudan uzaklaştırır.");
         ban.requiresConfirmation = true;
+        ban.smartMultiplierEnabled = true;
+        ban.multiplierKeyword = "yasakladı";
+        ban.reductionKeyword = "";
         ban.variables.add(new CommandVariable("reason", "hile, uygunsuz icerik, kural ihlali", false));
         ban.variables.add(new CommandVariable("duration", "1d, 7d, 30d", false));
         list.add(ban);
 
-        ModerationAction ipban = new ModerationAction("ipban", "/ipban %player% %duration% %reason%", 0xFFB00000, "Oyuncunun IP adresini yasaklar.");
+        ModerationAction ipban = new ModerationAction("ipban", "/ipban %player% %duration% %reason%", 0xFFFF5555, "Oyuncunun IP adresini yasaklar.");
         ipban.requiresConfirmation = true;
+        ipban.smartMultiplierEnabled = true;
+        ipban.multiplierKeyword = "yasakladı";
         ipban.variables.add(new CommandVariable("reason", "hile, proxy/vpn, kural ihlali", false));
         ipban.variables.add(new CommandVariable("duration", "1h, 3h, 6h, 1d, 7d, 30d", false));
         list.add(ipban);
 
         ModerationAction mute = new ModerationAction("mute", "/mute %player% %duration% %reason%", 0xFF555555, "Oyuncunun sohbet erişimini kapatır.");
+        mute.smartMultiplierEnabled = true;
+        mute.multiplierKeyword = "susturdu";
+        mute.reductionKeyword = "";
         mute.variables.add(new CommandVariable("reason", "spam, küfür, argo, hakaret", false));
         mute.variables.add(new CommandVariable("duration", "30m, 1h, 6h, 1d, 7d, 30d", false));
         list.add(mute);
 
-        ModerationAction voiceMute = new ModerationAction("voice mute", "/lp user %player% permission settemp voicechat.speak false %duration%", 0xFF0099CC, "Oyuncunun sesli sohbet yetkisini süreli olarak alır.");
+        ModerationAction voiceMute = new ModerationAction("voice mute", "/lp user %player% permission settemp voicechat.speak false %duration%", 0xFF555555, "Oyuncunun sesli sohbet yetkisini süreli olarak alır.");
         voiceMute.variables.add(new CommandVariable("duration", "1h, 3h, 6h, 1d, 7d, 30d", false));
         list.add(voiceMute);
 
-        list.add(new ModerationAction("tp", "/tp %player%", 0xFF00FF66, "Hedef oyuncunun yanına ışınlanır."));
-        list.add(new ModerationAction("tphere", "/tphere %player%", 0xFF00FFFF, "Hedef oyuncuyu yanına çeker."));
-        list.add(new ModerationAction("invsee", "/invsee %player%", 0xFFCCCCCC, "Oyuncunun envanterini açar."));
-        list.add(new ModerationAction("axir view", "/axir view %player%", 0xFF991400, "Oyuncunun ceza geçmişini görüntüler."));
+        list.add(new ModerationAction("tp", "/tp %player%", 0xFF555555, "Hedef oyuncunun yanına ışınlanır."));
+        list.add(new ModerationAction("tphere", "/tphere %player%", 0xFF555555, "Hedef oyuncuyu yanına çeker."));
+        list.add(new ModerationAction("invsee", "/invsee %player%", 0xFF555555, "Oyuncunun envanterini açar."));
+        list.add(new ModerationAction("axir view", "/axir view %player%", 0xFF555555, "Oyuncunun ceza geçmişini görüntüler."));
 
         return list;
     }

@@ -28,7 +28,7 @@ public class SmthsConfigScreen {
             .setParentScreen(parent)
             .setTitle(Text.literal("§bSmthsModeration Config"))
             .transparentBackground()
-            .setSavingRunnable(() -> {})
+            .setSavingRunnable(() -> { ActionsManager.save(); })
             .setDoesConfirmSave(true);
 
         ConfigCategory main = builder.getOrCreateCategory(Text.literal("Moderation Actions"));
@@ -146,13 +146,13 @@ public class SmthsConfigScreen {
                 .build()
             );
 
-            // Smart Penalty Multiplier sub-category
+            // Penalty Multiplier sub-category
             var smartSub = ConfigEntryBuilder.create()
-                .startSubCategory(Text.literal("§6Smart Penalty Multiplier"));
-            smartSub.setExpanded(expandedStates.getOrDefault("Smart: " + action.type, false));
+                .startSubCategory(Text.literal("§6Penalty Multiplier"));
+            smartSub.setExpanded(expandedStates.getOrDefault("PM: " + action.type, false));
 
             smartSub.add(ConfigEntryBuilder.create()
-                .startBooleanToggle(Text.literal("Enable Smart Multiplier"), action.smartMultiplierEnabled)
+                .startBooleanToggle(Text.literal("Enable Multiplier"), action.smartMultiplierEnabled)
                 .setDefaultValue(false)
                 .setSaveConsumer(v -> action.smartMultiplierEnabled = v)
                 .build()
@@ -187,6 +187,20 @@ public class SmthsConfigScreen {
                 .setMin(1.0)
                 .setMax(100.0)
                 .setSaveConsumer(v -> action.multiplierMax = v)
+                .build()
+            );
+
+            smartSub.add(ConfigEntryBuilder.create()
+                .startStrField(Text.literal("Reduction Keyword (e.g. kaldırdı)"), action.reductionKeyword)
+                .setDefaultValue("kaldırdı")
+                .setSaveConsumer(v -> action.reductionKeyword = v)
+                .build()
+            );
+
+            smartSub.add(ConfigEntryBuilder.create()
+                .startStrField(Text.literal("Target Variable for PM"), action.targetVariableForPM)
+                .setDefaultValue("duration")
+                .setSaveConsumer(v -> action.targetVariableForPM = v)
                 .build()
             );
 
@@ -256,7 +270,7 @@ public class SmthsConfigScreen {
                     for (Element subEntry : sub.children()) {
                         if (subEntry instanceof SubCategoryListEntry nestedSub) {
                             expandedStates.put(nestedSub.getCategoryName().getString(), nestedSub.isExpanded());
-                            // Handle 3rd level (Smart Penalty Multiplier inside action)
+                            // Handle 3rd level (Penalty Multiplier inside action)
                             for (Element nestedSubEntry : nestedSub.children()) {
                                 if (nestedSubEntry instanceof SubCategoryListEntry thirdLevel) {
                                     expandedStates.put(thirdLevel.getCategoryName().getString(), thirdLevel.isExpanded());

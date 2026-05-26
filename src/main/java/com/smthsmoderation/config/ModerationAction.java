@@ -24,6 +24,8 @@ public class ModerationAction {
     public String basePenaltyTime = "30m";
     public double multiplierStep = 0.20;
     public double multiplierMax = 3.0;
+    public String reductionKeyword = "kaldırdı";
+    public String targetVariableForPM = "duration";
 
     public ModerationAction() {}
 

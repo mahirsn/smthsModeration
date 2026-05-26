@@ -7,7 +7,6 @@ import com.smthsmoderation.util.GuiUtil;
 import com.smthsmoderation.util.TimeUtils;
 import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
-import io.wispforest.owo.ui.component.LabelComponent;
 import io.wispforest.owo.ui.component.TextBoxComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
@@ -51,10 +50,13 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
 
     private final Map<String, Integer> infractionCounts = new HashMap<>();
     private FlowLayout multiplierResultsContainer;
-    private ButtonComponent applySmartPenaltyBtn;
 
     private final Map<String, TextBoxComponent> varFields = new HashMap<>();
     private final List<ButtonComponent> actionButtons = new ArrayList<>();
+
+
+    // --- Constants ---
+    private static final String HISTORY_COMMAND = "history ";
 
     public ModerationScreen(String playerName, Identifier skinTexture) {
         this.playerName = playerName;
@@ -109,7 +111,6 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         confirmRow = createConfirmRow();
         buildExecuteButton(leftColumn);
         buildHistoryButton(leftColumn);
-        buildApplySmartPenaltyButton(leftColumn);
 
         historyContent = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
         historyContent.gap(2);
@@ -236,7 +237,9 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
             varFields.put(var.name, field);
 
             List<String> presetList = var.getPresetList();
-            if (!presetList.isEmpty()) {
+            boolean showPM = currentAction.smartMultiplierEnabled
+                    && currentAction.targetVariableForPM.equalsIgnoreCase(var.name);
+            if (!presetList.isEmpty() || showPM) {
                 FlowLayout chipRow = UIContainers.horizontalFlow(Sizing.fill(), Sizing.content());
                 chipRow.gap(4);
                 for (String preset : presetList) {
@@ -248,6 +251,21 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
                     chip.renderer(GuiUtil.modernButton(GuiUtil.DARK_BG, GuiUtil.DARK_BG_HOVER, GuiUtil.DISABLED));
                     chip.sizing(Sizing.content(), Sizing.fixed(16));
                     chipRow.child(chip);
+                }
+                if (showPM) {
+                    ButtonComponent pmChip = UIComponents.button(Text.literal("§cPM"), b -> {
+                        double mult = calculateMultiplier(currentAction);
+                        if (mult > 0) {
+                            long baseMinutes = TimeUtils.parseMinutes(currentAction.basePenaltyTime);
+                            long totalMinutes = TimeUtils.multiplyMinutes(baseMinutes, mult);
+                            field.text(TimeUtils.formatMinutes(totalMinutes));
+                        }
+                        updatePreview();
+                        updateExecuteButton();
+                    });
+                    pmChip.renderer(GuiUtil.modernButton(GuiUtil.DARK_BG, GuiUtil.DARK_BG_HOVER, GuiUtil.DISABLED));
+                    pmChip.sizing(Sizing.content(), Sizing.fixed(16));
+                    chipRow.child(pmChip);
                 }
                 variablesSection.child(chipRow);
             }
@@ -280,11 +298,13 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         selectedIndex = index;
         currentAction = configActions.get(index);
         showingConfirmation = false;
+        infractionCounts.clear();
 
         updateActionSelection();
         refreshVariables();
         updatePreview();
         updateExecuteButton();
+        updateMultiplierDisplay();
     }
 
     private FlowLayout createConfirmRow() {
@@ -338,7 +358,7 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
                 historyLogContent.child(UIComponents.label(Text.literal("§7Fetching history for §f" + playerName + "...")));
                 MinecraftClient client = MinecraftClient.getInstance();
                 if (client.getNetworkHandler() != null) {
-                    client.getNetworkHandler().sendChatCommand("history " + playerName + " " + ActionsManager.historyCommandLimit);
+                    client.getNetworkHandler().sendChatCommand(HISTORY_COMMAND + playerName + " " + ActionsManager.historyCommandLimit);
                 }
             }
         );
@@ -356,8 +376,12 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
 
             String lower = raw.toLowerCase(Locale.ROOT);
             for (ModerationAction action : instance.configActions) {
-                if (action.smartMultiplierEnabled && !action.multiplierKeyword.isEmpty()
-                        && lower.contains(action.multiplierKeyword.toLowerCase(Locale.ROOT))) {
+                if (!action.smartMultiplierEnabled) continue;
+                String kw = action.multiplierKeyword.toLowerCase(Locale.ROOT);
+                String rk = action.reductionKeyword.toLowerCase(Locale.ROOT);
+                if (!rk.isEmpty() && lower.contains(rk)) {
+                    instance.infractionCounts.merge(action.type, -1, Integer::sum);
+                } else if (!kw.isEmpty() && lower.contains(kw)) {
                     instance.infractionCounts.merge(action.type, 1, Integer::sum);
                 }
             }
@@ -415,54 +439,32 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
 
     private double calculateMultiplier(ModerationAction action) {
         int count = infractionCounts.getOrDefault(action.type, 0);
-        if (count == 0) return 0.0;
+        if (count <= 0) return 0.0;
         double multiplier = 1.0 + (count * action.multiplierStep);
-        return Math.min(multiplier, action.multiplierMax);
+        return Math.max(1.0, Math.min(multiplier, action.multiplierMax));
     }
 
     private void updateMultiplierDisplay() {
         multiplierResultsContainer.clearChildren();
-        boolean hasAny = false;
-        for (ModerationAction action : configActions) {
-            if (!action.smartMultiplierEnabled || action.multiplierKeyword.isEmpty()) continue;
-            int count = infractionCounts.getOrDefault(action.type, 0);
-            if (count == 0) continue;
-            hasAny = true;
-            double mult = calculateMultiplier(action);
-            long baseMinutes = TimeUtils.parseMinutes(action.basePenaltyTime);
-            long totalMinutes = TimeUtils.multiplyMinutes(baseMinutes, mult);
-            String formatted = TimeUtils.formatMinutes(totalMinutes);
-            multiplierResultsContainer.child(UIComponents.label(Text.literal(
-                "§e" + action.type + " §7-> x" + String.format("%.2f", mult)
-                + " §8(" + action.basePenaltyTime + " × " + count + " = §f" + formatted + "§8)"
-            )));
+        if (currentAction == null || !currentAction.smartMultiplierEnabled
+                || currentAction.multiplierKeyword.isEmpty()) {
+            multiplierResultsContainer.child(UIComponents.label(Text.literal("§7No multipliers active")));
+            return;
         }
-        if (!hasAny) {
-            multiplierResultsContainer.child(UIComponents.label(Text.literal("§7No smart multipliers active")));
+        int count = infractionCounts.getOrDefault(currentAction.type, 0);
+        if (count == 0) {
+            multiplierResultsContainer.child(UIComponents.label(Text.literal("§7No multipliers active")));
+            return;
         }
+        double mult = calculateMultiplier(currentAction);
+        long baseMinutes = TimeUtils.parseMinutes(currentAction.basePenaltyTime);
+        long totalMinutes = TimeUtils.multiplyMinutes(baseMinutes, mult);
+        String formatted = TimeUtils.formatMinutes(totalMinutes);
+        multiplierResultsContainer.child(UIComponents.label(Text.literal(
+            "§e" + currentAction.type + " §7-> x" + String.format("%.2f", mult)
+            + " §8(" + currentAction.basePenaltyTime + " × " + count + " = §f" + formatted + "§8)"
+        )));
     }
 
-    private void buildApplySmartPenaltyButton(FlowLayout panel) {
-        applySmartPenaltyBtn = UIComponents.button(
-            Text.literal("§6Apply Smart Penalty"),
-            b -> {
-                if (currentAction == null) return;
-                double mult = calculateMultiplier(currentAction);
-                if (mult <= 0) return;
-                long baseMinutes = TimeUtils.parseMinutes(currentAction.basePenaltyTime);
-                long totalMinutes = TimeUtils.multiplyMinutes(baseMinutes, mult);
-                String formatted = TimeUtils.formatMinutes(totalMinutes);
-                TextBoxComponent durationField = varFields.get("duration");
-                if (durationField != null) {
-                    durationField.text(formatted);
-                }
-                updatePreview();
-                updateExecuteButton();
-            }
-        );
-        applySmartPenaltyBtn.renderer(GuiUtil.modernButton(0xFF6B3FA0, 0xFF7F4FB5, GuiUtil.DISABLED));
-        applySmartPenaltyBtn.sizing(Sizing.fill(), Sizing.fixed(20));
-        applySmartPenaltyBtn.tooltip(Text.literal("§6Calculate smart penalty duration for selected action"));
-        panel.child(applySmartPenaltyBtn);
-    }
+
 }
