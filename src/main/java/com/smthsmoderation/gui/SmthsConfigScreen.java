@@ -146,6 +146,52 @@ public class SmthsConfigScreen {
                 .build()
             );
 
+            // Smart Penalty Multiplier sub-category
+            var smartSub = ConfigEntryBuilder.create()
+                .startSubCategory(Text.literal("§6Smart Penalty Multiplier"));
+            smartSub.setExpanded(expandedStates.getOrDefault("Smart: " + action.type, false));
+
+            smartSub.add(ConfigEntryBuilder.create()
+                .startBooleanToggle(Text.literal("Enable Smart Multiplier"), action.smartMultiplierEnabled)
+                .setDefaultValue(false)
+                .setSaveConsumer(v -> action.smartMultiplierEnabled = v)
+                .build()
+            );
+
+            smartSub.add(ConfigEntryBuilder.create()
+                .startStrField(Text.literal("Keyword (e.g. muted)"), action.multiplierKeyword)
+                .setDefaultValue("")
+                .setSaveConsumer(v -> action.multiplierKeyword = v)
+                .build()
+            );
+
+            smartSub.add(ConfigEntryBuilder.create()
+                .startStrField(Text.literal("Base Penalty Time (e.g. 30m)"), action.basePenaltyTime)
+                .setDefaultValue("30m")
+                .setSaveConsumer(v -> action.basePenaltyTime = v)
+                .build()
+            );
+
+            smartSub.add(ConfigEntryBuilder.create()
+                .startDoubleField(Text.literal("Multiplier Step (per infraction)"), action.multiplierStep)
+                .setDefaultValue(0.20)
+                .setMin(0.01)
+                .setMax(10.0)
+                .setSaveConsumer(v -> action.multiplierStep = v)
+                .build()
+            );
+
+            smartSub.add(ConfigEntryBuilder.create()
+                .startDoubleField(Text.literal("Max Multiplier"), action.multiplierMax)
+                .setDefaultValue(3.0)
+                .setMin(1.0)
+                .setMax(100.0)
+                .setSaveConsumer(v -> action.multiplierMax = v)
+                .build()
+            );
+
+            actionSub.add(smartSub.build());
+
             for (int i = 0; i < action.variables.size(); i++) {
                 CommandVariable var = action.variables.get(i);
                 int vi = i;
@@ -210,6 +256,12 @@ public class SmthsConfigScreen {
                     for (Element subEntry : sub.children()) {
                         if (subEntry instanceof SubCategoryListEntry nestedSub) {
                             expandedStates.put(nestedSub.getCategoryName().getString(), nestedSub.isExpanded());
+                            // Handle 3rd level (Smart Penalty Multiplier inside action)
+                            for (Element nestedSubEntry : nestedSub.children()) {
+                                if (nestedSubEntry instanceof SubCategoryListEntry thirdLevel) {
+                                    expandedStates.put(thirdLevel.getCategoryName().getString(), thirdLevel.isExpanded());
+                                }
+                            }
                         }
                     }
                 }

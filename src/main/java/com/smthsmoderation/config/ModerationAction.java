@@ -18,6 +18,13 @@ public class ModerationAction {
     public boolean isVisible = true;
     public List<CommandVariable> variables = new ArrayList<>();
 
+    // Smart Penalty Multiplier fields
+    public boolean smartMultiplierEnabled = false;
+    public String multiplierKeyword = "";
+    public String basePenaltyTime = "30m";
+    public double multiplierStep = 0.20;
+    public double multiplierMax = 3.0;
+
     public ModerationAction() {}
 
     public ModerationAction(String type, String template, int color, String desc) {

@@ -4,6 +4,7 @@ import com.smthsmoderation.config.ActionsManager;
 import com.smthsmoderation.config.CommandVariable;
 import com.smthsmoderation.config.ModerationAction;
 import com.smthsmoderation.util.GuiUtil;
+import com.smthsmoderation.util.TimeUtils;
 import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.LabelComponent;
@@ -20,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,6 +49,10 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
     private boolean showingConfirmation = false;
     private boolean isAwaitingHistory = false;
 
+    private final Map<String, Integer> infractionCounts = new HashMap<>();
+    private FlowLayout multiplierResultsContainer;
+    private ButtonComponent applySmartPenaltyBtn;
+
     private final Map<String, TextBoxComponent> varFields = new HashMap<>();
     private final List<ButtonComponent> actionButtons = new ArrayList<>();
 
@@ -60,6 +66,7 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
     @Override
     public void close() {
         isAwaitingHistory = false;
+        infractionCounts.clear();
         instance = null;
         super.close();
     }
@@ -102,6 +109,7 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         confirmRow = createConfirmRow();
         buildExecuteButton(leftColumn);
         buildHistoryButton(leftColumn);
+        buildApplySmartPenaltyButton(leftColumn);
 
         historyContent = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
         historyContent.gap(2);
@@ -117,6 +125,10 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         historyLogContent.gap(2);
         historyLogScroll = UIContainers.verticalScroll(Sizing.fill(), Sizing.fixed(180), historyLogContent);
         rightColumn.child(historyLogScroll);
+
+        multiplierResultsContainer = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
+        multiplierResultsContainer.gap(2);
+        rightColumn.child(multiplierResultsContainer);
 
         panel.child(leftColumn);
         panel.child(rightColumn);
@@ -320,7 +332,9 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
             Text.literal("§7Show History"),
             b -> {
                 isAwaitingHistory = true;
+                infractionCounts.clear();
                 historyLogContent.clearChildren();
+                multiplierResultsContainer.clearChildren();
                 historyLogContent.child(UIComponents.label(Text.literal("§7Fetching history for §f" + playerName + "...")));
                 MinecraftClient client = MinecraftClient.getInstance();
                 if (client.getNetworkHandler() != null) {
@@ -339,6 +353,15 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
             String raw = message.getString().trim();
             if (!raw.startsWith("➩")) return;
             instance.historyLogContent.child(UIComponents.label(message).maxWidth(200));
+
+            String lower = raw.toLowerCase(Locale.ROOT);
+            for (ModerationAction action : instance.configActions) {
+                if (action.smartMultiplierEnabled && !action.multiplierKeyword.isEmpty()
+                        && lower.contains(action.multiplierKeyword.toLowerCase(Locale.ROOT))) {
+                    instance.infractionCounts.merge(action.type, 1, Integer::sum);
+                }
+            }
+            instance.updateMultiplierDisplay();
         }
     }
 
@@ -388,5 +411,58 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         MinecraftClient.getInstance().player.networkHandler.sendChatCommand(
             command.startsWith("/") ? command.substring(1) : command
         );
+    }
+
+    private double calculateMultiplier(ModerationAction action) {
+        int count = infractionCounts.getOrDefault(action.type, 0);
+        if (count == 0) return 0.0;
+        double multiplier = 1.0 + (count * action.multiplierStep);
+        return Math.min(multiplier, action.multiplierMax);
+    }
+
+    private void updateMultiplierDisplay() {
+        multiplierResultsContainer.clearChildren();
+        boolean hasAny = false;
+        for (ModerationAction action : configActions) {
+            if (!action.smartMultiplierEnabled || action.multiplierKeyword.isEmpty()) continue;
+            int count = infractionCounts.getOrDefault(action.type, 0);
+            if (count == 0) continue;
+            hasAny = true;
+            double mult = calculateMultiplier(action);
+            long baseMinutes = TimeUtils.parseMinutes(action.basePenaltyTime);
+            long totalMinutes = TimeUtils.multiplyMinutes(baseMinutes, mult);
+            String formatted = TimeUtils.formatMinutes(totalMinutes);
+            multiplierResultsContainer.child(UIComponents.label(Text.literal(
+                "§e" + action.type + " §7-> x" + String.format("%.2f", mult)
+                + " §8(" + action.basePenaltyTime + " × " + count + " = §f" + formatted + "§8)"
+            )));
+        }
+        if (!hasAny) {
+            multiplierResultsContainer.child(UIComponents.label(Text.literal("§7No smart multipliers active")));
+        }
+    }
+
+    private void buildApplySmartPenaltyButton(FlowLayout panel) {
+        applySmartPenaltyBtn = UIComponents.button(
+            Text.literal("§6Apply Smart Penalty"),
+            b -> {
+                if (currentAction == null) return;
+                double mult = calculateMultiplier(currentAction);
+                if (mult <= 0) return;
+                long baseMinutes = TimeUtils.parseMinutes(currentAction.basePenaltyTime);
+                long totalMinutes = TimeUtils.multiplyMinutes(baseMinutes, mult);
+                String formatted = TimeUtils.formatMinutes(totalMinutes);
+                TextBoxComponent durationField = varFields.get("duration");
+                if (durationField != null) {
+                    durationField.text(formatted);
+                }
+                updatePreview();
+                updateExecuteButton();
+            }
+        );
+        applySmartPenaltyBtn.renderer(GuiUtil.modernButton(0xFF6B3FA0, 0xFF7F4FB5, GuiUtil.DISABLED));
+        applySmartPenaltyBtn.sizing(Sizing.fill(), Sizing.fixed(20));
+        applySmartPenaltyBtn.tooltip(Text.literal("§6Calculate smart penalty duration for selected action"));
+        panel.child(applySmartPenaltyBtn);
     }
 }
