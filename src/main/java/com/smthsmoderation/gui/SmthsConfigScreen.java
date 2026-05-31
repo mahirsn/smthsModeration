@@ -84,6 +84,32 @@ public class SmthsConfigScreen {
             .startTextDescription(Text.literal("§7Highly Customizable Command Executer (designed for moderation)"))
             .build());
 
+        var loggingSub = ConfigEntryBuilder.create()
+            .startSubCategory(Text.literal("§3Local Logging"));
+        loggingSub.setExpanded(expandedStates.getOrDefault("Local Logging", false));
+
+        loggingSub.add(ConfigEntryBuilder.create()
+            .startBooleanToggle(Text.literal("Enable Local Logging"), ActionsManager.enableLocalLogging)
+            .setDefaultValue(true)
+            .setSaveConsumer(v -> {
+                ActionsManager.enableLocalLogging = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        loggingSub.add(ConfigEntryBuilder.create()
+            .startIntField(Text.literal("Logged Message Count"), ActionsManager.logMessageCount)
+            .setDefaultValue(30)
+            .setMin(5)
+            .setMax(200)
+            .setSaveConsumer(v -> {
+                ActionsManager.logMessageCount = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        main.addEntry(loggingSub.build());
+
         main.addEntry(new ButtonEntry(Text.literal("[Save Config]"), GREEN, () -> {
             Screen current = MinecraftClient.getInstance().currentScreen;
             if (current instanceof AbstractConfigScreen acs) {

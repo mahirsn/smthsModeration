@@ -3,6 +3,7 @@ package com.smthsmoderation;
 import com.smthsmoderation.config.ActionsManager;
 import com.smthsmoderation.gui.ModerationScreen;
 import com.smthsmoderation.gui.PlayerSelectorScreen;
+import com.smthsmoderation.util.ChatBacklog;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -30,6 +31,7 @@ public class SmthsmoderationModClient implements ClientModInitializer {
         registerShiftClickHandler();
         registerCommands();
         registerHistoryInterceptor();
+        registerChatBacklog();
     }
 
     private void registerKeybind() {
@@ -90,6 +92,13 @@ public class SmthsmoderationModClient implements ClientModInitializer {
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
             if (!overlay && !message.getString().trim().startsWith("➩")) return;
             ModerationScreen.appendHistoryLine(message);
+        });
+    }
+
+    private void registerChatBacklog() {
+        ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
+            if (overlay) return;
+            ChatBacklog.push(message.getString());
         });
     }
 }

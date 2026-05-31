@@ -25,6 +25,8 @@ public class ActionsManager {
     public static boolean enableChatClick = true;
     public static boolean showHistoryButton = true;
     public static int historyCommandLimit = 10;
+    public static boolean enableLocalLogging = true;
+    public static int logMessageCount = 30;
 
     public static class ModConfig {
         public boolean modEnabled = true;
@@ -32,6 +34,8 @@ public class ActionsManager {
         public boolean enableChatClick = true;
         public boolean showHistoryButton = true;
         public int historyCommandLimit = 10;
+        public boolean enableLocalLogging = true;
+        public int logMessageCount = 30;
     }
 
     public static void load() {
@@ -61,6 +65,8 @@ public class ActionsManager {
                     enableChatClick = cfg.enableChatClick;
                     showHistoryButton = cfg.showHistoryButton;
                     historyCommandLimit = cfg.historyCommandLimit;
+                    enableLocalLogging = cfg.enableLocalLogging;
+                    logMessageCount = cfg.logMessageCount;
                     return;
                 }
             }
@@ -70,6 +76,8 @@ public class ActionsManager {
         enableChatClick = true;
         showHistoryButton = true;
         historyCommandLimit = 10;
+        enableLocalLogging = true;
+        logMessageCount = 30;
     }
 
     public static void saveConfig() {
@@ -81,6 +89,8 @@ public class ActionsManager {
             cfg.enableChatClick = enableChatClick;
             cfg.showHistoryButton = showHistoryButton;
             cfg.historyCommandLimit = historyCommandLimit;
+            cfg.enableLocalLogging = enableLocalLogging;
+            cfg.logMessageCount = logMessageCount;
             Files.writeString(CONFIG_PATH, GSON.toJson(cfg));
         } catch (IOException ignored) {}
     }

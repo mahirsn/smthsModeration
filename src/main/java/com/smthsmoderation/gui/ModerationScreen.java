@@ -3,8 +3,10 @@ package com.smthsmoderation.gui;
 import com.smthsmoderation.config.ActionsManager;
 import com.smthsmoderation.config.CommandVariable;
 import com.smthsmoderation.config.ModerationAction;
+import com.smthsmoderation.util.ChatBacklog;
 import com.smthsmoderation.util.GuiUtil;
 import com.smthsmoderation.util.TimeUtils;
+import net.fabricmc.loader.api.FabricLoader;
 import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.TextBoxComponent;
@@ -17,8 +19,14 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.NotNull;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -435,6 +443,42 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         MinecraftClient.getInstance().player.networkHandler.sendChatCommand(
             command.startsWith("/") ? command.substring(1) : command
         );
+
+        if (ActionsManager.enableLocalLogging) {
+            writePunishmentLog(command);
+        }
+    }
+
+    private void writePunishmentLog(String command) {
+        try {
+            Path logDir = FabricLoader.getInstance().getGameDir().resolve("smthsmoderations-logs");
+            Files.createDirectories(logDir);
+
+            String timestamp = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new Date());
+            String fileName = timestamp + "_" + playerName + ".txt";
+            Path logFile = logDir.resolve(fileName);
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("=== PUNISHMENT LOG ===\n");
+            sb.append("Target Player: ").append(playerName).append("\n");
+            sb.append("Action Type: ").append(currentAction.type).append("\n");
+
+            String duration = varFields.containsKey("duration") ? varFields.get("duration").getText().trim() : "N/A";
+            String reason = varFields.containsKey("reason") ? varFields.get("reason").getText().trim() : "N/A";
+            sb.append("Duration: ").append(duration).append("\n");
+            sb.append("Reason: ").append(reason).append("\n");
+            sb.append("Executed Command: /").append(command).append("\n");
+            sb.append("Date & Time: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())).append("\n");
+            sb.append("\n\n");
+
+            LinkedList<String> backlog = ChatBacklog.snapshot();
+            sb.append("=== RECENT CHAT HISTORY (Last ").append(backlog.size()).append(" messages) ===\n");
+            for (String msg : backlog) {
+                sb.append(msg).append("\n");
+            }
+
+            Files.writeString(logFile, sb.toString());
+        } catch (IOException ignored) {}
     }
 
     private double calculateMultiplier(ModerationAction action) {
