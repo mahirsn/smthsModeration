@@ -4,6 +4,7 @@ import com.smthsmoderation.config.ActionsManager;
 import com.smthsmoderation.config.CommandVariable;
 import com.smthsmoderation.config.ModerationAction;
 import com.smthsmoderation.util.ChatBacklog;
+import com.smthsmoderation.util.DiscordWebhook;
 import com.smthsmoderation.util.GuiUtil;
 import com.smthsmoderation.util.TimeUtils;
 import net.fabricmc.loader.api.FabricLoader;
@@ -446,6 +447,14 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
 
         if (ActionsManager.enableLocalLogging) {
             writePunishmentLog(command);
+        }
+
+        if (ActionsManager.enableWebhook && !ActionsManager.webhookUrl.isBlank()) {
+            String duration = varFields.containsKey("duration") ? varFields.get("duration").getText().trim() : "";
+            String reason = varFields.containsKey("reason") ? varFields.get("reason").getText().trim() : "";
+            List<String> history = new ArrayList<>(ChatBacklog.snapshot());
+            DiscordWebhook.sendEmbed(playerName, currentAction.type, duration, reason,
+                command, currentAction.buttonColor, history);
         }
     }
 

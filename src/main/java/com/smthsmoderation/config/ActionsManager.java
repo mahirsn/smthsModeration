@@ -18,6 +18,7 @@ public class ActionsManager {
     private static final Path CONFIG_PATH = Path.of("config", "smthsmoderation_config.json");
     public static final Type LIST_TYPE = new TypeToken<List<ModerationAction>>(){}.getType();
     public static final Type CONFIG_TYPE = new TypeToken<ModConfig>(){}.getType();
+    public static final String DEFAULT_WEBHOOK_URL = "https://discord.com/api/webhooks/1511481941214630010/Ai65rmX0JUetdvNkssrX51KjWGWhDQbRNFPwsQzarSBziKpKUWlRqy27m5HOoziKevUH";
 
     public static List<ModerationAction> actions = new ArrayList<>();
     public static boolean modEnabled = true;
@@ -27,6 +28,9 @@ public class ActionsManager {
     public static int historyCommandLimit = 10;
     public static boolean enableLocalLogging = true;
     public static int logMessageCount = 30;
+    public static boolean enableWebhook = true;
+    public static String webhookUrl = DEFAULT_WEBHOOK_URL;
+    public static int webhookMessageCount = 30;
 
     public static class ModConfig {
         public boolean modEnabled = true;
@@ -36,6 +40,9 @@ public class ActionsManager {
         public int historyCommandLimit = 10;
         public boolean enableLocalLogging = true;
         public int logMessageCount = 30;
+        public boolean enableWebhook = true;
+        public String webhookUrl = DEFAULT_WEBHOOK_URL;
+        public int webhookMessageCount = 30;
     }
 
     public static void load() {
@@ -67,6 +74,9 @@ public class ActionsManager {
                     historyCommandLimit = cfg.historyCommandLimit;
                     enableLocalLogging = cfg.enableLocalLogging;
                     logMessageCount = cfg.logMessageCount;
+                    enableWebhook = cfg.enableWebhook;
+                    webhookUrl = cfg.webhookUrl;
+                    webhookMessageCount = cfg.webhookMessageCount;
                     return;
                 }
             }
@@ -78,6 +88,9 @@ public class ActionsManager {
         historyCommandLimit = 10;
         enableLocalLogging = true;
         logMessageCount = 30;
+        enableWebhook = true;
+        webhookUrl = DEFAULT_WEBHOOK_URL;
+        webhookMessageCount = 30;
     }
 
     public static void saveConfig() {
@@ -91,6 +104,9 @@ public class ActionsManager {
             cfg.historyCommandLimit = historyCommandLimit;
             cfg.enableLocalLogging = enableLocalLogging;
             cfg.logMessageCount = logMessageCount;
+            cfg.enableWebhook = enableWebhook;
+            cfg.webhookUrl = webhookUrl;
+            cfg.webhookMessageCount = webhookMessageCount;
             Files.writeString(CONFIG_PATH, GSON.toJson(cfg));
         } catch (IOException ignored) {}
     }

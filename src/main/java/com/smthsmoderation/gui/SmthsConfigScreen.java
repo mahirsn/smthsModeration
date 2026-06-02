@@ -110,6 +110,44 @@ public class SmthsConfigScreen {
 
         main.addEntry(loggingSub.build());
 
+        var webhookSub = ConfigEntryBuilder.create()
+            .startSubCategory(Text.literal("§5Discord Webhook"));
+        webhookSub.setExpanded(expandedStates.getOrDefault("Discord Webhook", false));
+
+        webhookSub.add(ConfigEntryBuilder.create()
+            .startBooleanToggle(Text.literal("§fEnable Webhook"), ActionsManager.enableWebhook)
+            .setDefaultValue(false)
+            .setTooltip(Text.literal("§7Send moderation embeds to a Discord webhook.\n§7Requires a valid webhook URL."))
+            .setSaveConsumer(v -> {
+                ActionsManager.enableWebhook = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        webhookSub.add(ConfigEntryBuilder.create()
+            .startStrField(Text.literal("§fWebhook URL"), ActionsManager.webhookUrl)
+            .setDefaultValue("")
+            .setTooltip(Text.literal("§7Paste your Discord channel webhook URL here."))
+            .setSaveConsumer(v -> {
+                ActionsManager.webhookUrl = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        webhookSub.add(ConfigEntryBuilder.create()
+            .startIntField(Text.literal("§fWebhook Message Count"), ActionsManager.webhookMessageCount)
+            .setDefaultValue(30)
+            .setMin(5)
+            .setMax(50)
+            .setTooltip(Text.literal("§7Number of recent chat messages included\n§7in the webhook embed."))
+            .setSaveConsumer(v -> {
+                ActionsManager.webhookMessageCount = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        main.addEntry(webhookSub.build());
+
         main.addEntry(new ButtonEntry(Text.literal("[Save Config]"), GREEN, () -> {
             Screen current = MinecraftClient.getInstance().currentScreen;
             if (current instanceof AbstractConfigScreen acs) {
