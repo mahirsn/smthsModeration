@@ -146,6 +146,46 @@ public class SmthsConfigScreen {
             })
             .build());
 
+        webhookSub.add(ConfigEntryBuilder.create()
+            .startBooleanToggle(Text.literal("§fLog Ban Actions"), ActionsManager.webhookLogBan)
+            .setDefaultValue(true)
+            .setTooltip(Text.literal("§7Send webhook when a ban action is executed."))
+            .setSaveConsumer(v -> {
+                ActionsManager.webhookLogBan = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        webhookSub.add(ConfigEntryBuilder.create()
+            .startBooleanToggle(Text.literal("§fLog Mute Actions"), ActionsManager.webhookLogMute)
+            .setDefaultValue(true)
+            .setTooltip(Text.literal("§7Send webhook when a mute action is executed."))
+            .setSaveConsumer(v -> {
+                ActionsManager.webhookLogMute = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        webhookSub.add(ConfigEntryBuilder.create()
+            .startBooleanToggle(Text.literal("§fLog Kick Actions"), ActionsManager.webhookLogKick)
+            .setDefaultValue(true)
+            .setTooltip(Text.literal("§7Send webhook when a kick action is executed."))
+            .setSaveConsumer(v -> {
+                ActionsManager.webhookLogKick = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
+        webhookSub.add(ConfigEntryBuilder.create()
+            .startBooleanToggle(Text.literal("§fLog Warn Actions"), ActionsManager.webhookLogWarn)
+            .setDefaultValue(true)
+            .setTooltip(Text.literal("§7Send webhook when a warn action is executed."))
+            .setSaveConsumer(v -> {
+                ActionsManager.webhookLogWarn = v;
+                ActionsManager.saveConfig();
+            })
+            .build());
+
         main.addEntry(webhookSub.build());
 
         main.addEntry(new ButtonEntry(Text.literal("[Save Config]"), GREEN, () -> {

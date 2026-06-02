@@ -31,6 +31,10 @@ public class ActionsManager {
     public static boolean enableWebhook = true;
     public static String webhookUrl = DEFAULT_WEBHOOK_URL;
     public static int webhookMessageCount = 30;
+    public static boolean webhookLogBan = true;
+    public static boolean webhookLogMute = true;
+    public static boolean webhookLogKick = true;
+    public static boolean webhookLogWarn = true;
 
     public static class ModConfig {
         public boolean modEnabled = true;
@@ -43,6 +47,10 @@ public class ActionsManager {
         public boolean enableWebhook = true;
         public String webhookUrl = DEFAULT_WEBHOOK_URL;
         public int webhookMessageCount = 30;
+        public boolean webhookLogBan = true;
+        public boolean webhookLogMute = true;
+        public boolean webhookLogKick = true;
+        public boolean webhookLogWarn = true;
     }
 
     public static void load() {
@@ -77,6 +85,10 @@ public class ActionsManager {
                     enableWebhook = cfg.enableWebhook;
                     webhookUrl = cfg.webhookUrl;
                     webhookMessageCount = cfg.webhookMessageCount;
+                    webhookLogBan = cfg.webhookLogBan;
+                    webhookLogMute = cfg.webhookLogMute;
+                    webhookLogKick = cfg.webhookLogKick;
+                    webhookLogWarn = cfg.webhookLogWarn;
                     return;
                 }
             }
@@ -91,6 +103,10 @@ public class ActionsManager {
         enableWebhook = true;
         webhookUrl = DEFAULT_WEBHOOK_URL;
         webhookMessageCount = 30;
+        webhookLogBan = true;
+        webhookLogMute = true;
+        webhookLogKick = true;
+        webhookLogWarn = true;
     }
 
     public static void saveConfig() {
@@ -107,6 +123,10 @@ public class ActionsManager {
             cfg.enableWebhook = enableWebhook;
             cfg.webhookUrl = webhookUrl;
             cfg.webhookMessageCount = webhookMessageCount;
+            cfg.webhookLogBan = webhookLogBan;
+            cfg.webhookLogMute = webhookLogMute;
+            cfg.webhookLogKick = webhookLogKick;
+            cfg.webhookLogWarn = webhookLogWarn;
             Files.writeString(CONFIG_PATH, GSON.toJson(cfg));
         } catch (IOException ignored) {}
     }

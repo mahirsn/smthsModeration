@@ -108,16 +108,16 @@ public class DiscordWebhook {
         List<String> lastMessages = chatHistory.size() > maxMessages
             ? chatHistory.subList(chatHistory.size() - maxMessages, chatHistory.size())
             : chatHistory;
-        StringBuilder sb = new StringBuilder("```\n");
+        StringBuilder raw = new StringBuilder();
         for (String msg : lastMessages) {
-            sb.append(msg).append("\n");
+            raw.append(msg).append("\n");
         }
-        sb.append("```");
-        if (sb.length() > MAX_CHAT_LENGTH) {
-            sb.setLength(MAX_CHAT_LENGTH - 3);
-            sb.append("...");
+        String history = raw.toString();
+        int maxHistoryLength = 950;
+        if (history.length() > maxHistoryLength) {
+            history = history.substring(0, maxHistoryLength) + "\n...[TRUNCATED]";
         }
-        return sb.toString();
+        return "```text\n" + history + "\n```";
     }
 
     private static void sendClientMessage(String msg) {

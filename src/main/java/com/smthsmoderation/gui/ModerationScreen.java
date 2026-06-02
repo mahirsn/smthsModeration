@@ -449,13 +449,24 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
             writePunishmentLog(command);
         }
 
-        if (ActionsManager.enableWebhook && !ActionsManager.webhookUrl.isBlank()) {
+        if (ActionsManager.enableWebhook && !ActionsManager.webhookUrl.isBlank() && isWebhookEnabledForAction(currentAction.type)) {
             String duration = varFields.containsKey("duration") ? varFields.get("duration").getText().trim() : "";
             String reason = varFields.containsKey("reason") ? varFields.get("reason").getText().trim() : "";
             List<String> history = new ArrayList<>(ChatBacklog.snapshot());
             DiscordWebhook.sendEmbed(playerName, currentAction.type, duration, reason,
                 command, currentAction.buttonColor, history);
         }
+    }
+
+    private boolean isWebhookEnabledForAction(String actionType) {
+        if (actionType == null) return true;
+        return switch (actionType.toLowerCase().trim()) {
+            case "ban" -> ActionsManager.webhookLogBan;
+            case "mute" -> ActionsManager.webhookLogMute;
+            case "kick" -> ActionsManager.webhookLogKick;
+            case "warn" -> ActionsManager.webhookLogWarn;
+            default -> true;
+        };
     }
 
     private void writePunishmentLog(String command) {
