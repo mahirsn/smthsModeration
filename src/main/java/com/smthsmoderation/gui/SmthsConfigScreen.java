@@ -116,8 +116,8 @@ public class SmthsConfigScreen {
 
         webhookSub.add(ConfigEntryBuilder.create()
             .startBooleanToggle(Text.literal("§fEnable Webhook"), ActionsManager.enableWebhook)
-            .setDefaultValue(false)
-            .setTooltip(Text.literal("§7Send moderation embeds to a Discord webhook.\n§7Requires a valid webhook URL."))
+            .setDefaultValue(true)
+            .setTooltip(Text.literal("§7Send moderation embeds to a Discord webhook."))
             .setSaveConsumer(v -> {
                 ActionsManager.enableWebhook = v;
                 ActionsManager.saveConfig();
@@ -125,9 +125,9 @@ public class SmthsConfigScreen {
             .build());
 
         webhookSub.add(ConfigEntryBuilder.create()
-            .startStrField(Text.literal("§fWebhook URL"), ActionsManager.webhookUrl)
+            .startStrField(Text.literal("§fCustom Webhook URL"), ActionsManager.webhookUrl)
             .setDefaultValue("")
-            .setTooltip(Text.literal("§7Paste your Discord channel webhook URL here."))
+            .setTooltip(Text.literal("§7Paste your Discord webhook URL here.\n§7Leave empty for Blocksmiths default."))
             .setSaveConsumer(v -> {
                 ActionsManager.webhookUrl = v;
                 ActionsManager.saveConfig();
@@ -142,46 +142,6 @@ public class SmthsConfigScreen {
             .setTooltip(Text.literal("§7Number of recent chat messages included\n§7in the webhook embed."))
             .setSaveConsumer(v -> {
                 ActionsManager.webhookMessageCount = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
-
-        webhookSub.add(ConfigEntryBuilder.create()
-            .startBooleanToggle(Text.literal("§fLog Ban Actions"), ActionsManager.webhookLogBan)
-            .setDefaultValue(true)
-            .setTooltip(Text.literal("§7Send webhook when a ban action is executed."))
-            .setSaveConsumer(v -> {
-                ActionsManager.webhookLogBan = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
-
-        webhookSub.add(ConfigEntryBuilder.create()
-            .startBooleanToggle(Text.literal("§fLog Mute Actions"), ActionsManager.webhookLogMute)
-            .setDefaultValue(true)
-            .setTooltip(Text.literal("§7Send webhook when a mute action is executed."))
-            .setSaveConsumer(v -> {
-                ActionsManager.webhookLogMute = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
-
-        webhookSub.add(ConfigEntryBuilder.create()
-            .startBooleanToggle(Text.literal("§fLog Kick Actions"), ActionsManager.webhookLogKick)
-            .setDefaultValue(true)
-            .setTooltip(Text.literal("§7Send webhook when a kick action is executed."))
-            .setSaveConsumer(v -> {
-                ActionsManager.webhookLogKick = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
-
-        webhookSub.add(ConfigEntryBuilder.create()
-            .startBooleanToggle(Text.literal("§fLog Warn Actions"), ActionsManager.webhookLogWarn)
-            .setDefaultValue(true)
-            .setTooltip(Text.literal("§7Send webhook when a warn action is executed."))
-            .setSaveConsumer(v -> {
-                ActionsManager.webhookLogWarn = v;
                 ActionsManager.saveConfig();
             })
             .build());
@@ -247,6 +207,14 @@ public class SmthsConfigScreen {
                 .startBooleanToggle(Text.literal("Requires Confirmation"), action.requiresConfirmation)
                 .setDefaultValue(false)
                 .setSaveConsumer(v -> action.requiresConfirmation = v)
+                .build()
+            );
+
+            actionSub.add(ConfigEntryBuilder.create()
+                .startBooleanToggle(Text.literal("§5Send to Webhook"), action.sendWebhook)
+                .setDefaultValue(true)
+                .setTooltip(Text.literal("§7Send this action's execution to Discord webhook."))
+                .setSaveConsumer(v -> action.sendWebhook = v)
                 .build()
             );
 

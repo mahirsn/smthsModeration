@@ -27,6 +27,9 @@ public class ModerationAction {
     public String reductionKeyword = "kaldırdı";
     public String targetVariableForPM = "duration";
 
+    // Webhook per-action toggle
+    public boolean sendWebhook = true;
+
     public ModerationAction() {}
 
     public ModerationAction(String type, String template, int color, String desc) {

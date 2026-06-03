@@ -18,7 +18,6 @@ public class ActionsManager {
     private static final Path CONFIG_PATH = Path.of("config", "smthsmoderation_config.json");
     public static final Type LIST_TYPE = new TypeToken<List<ModerationAction>>(){}.getType();
     public static final Type CONFIG_TYPE = new TypeToken<ModConfig>(){}.getType();
-    public static final String DEFAULT_WEBHOOK_URL = "https://discord.com/api/webhooks/1511481941214630010/Ai65rmX0JUetdvNkssrX51KjWGWhDQbRNFPwsQzarSBziKpKUWlRqy27m5HOoziKevUH";
 
     public static List<ModerationAction> actions = new ArrayList<>();
     public static boolean modEnabled = true;
@@ -29,12 +28,8 @@ public class ActionsManager {
     public static boolean enableLocalLogging = true;
     public static int logMessageCount = 30;
     public static boolean enableWebhook = true;
-    public static String webhookUrl = DEFAULT_WEBHOOK_URL;
+    public static String webhookUrl = "";
     public static int webhookMessageCount = 30;
-    public static boolean webhookLogBan = true;
-    public static boolean webhookLogMute = true;
-    public static boolean webhookLogKick = true;
-    public static boolean webhookLogWarn = true;
 
     public static class ModConfig {
         public boolean modEnabled = true;
@@ -45,12 +40,8 @@ public class ActionsManager {
         public boolean enableLocalLogging = true;
         public int logMessageCount = 30;
         public boolean enableWebhook = true;
-        public String webhookUrl = DEFAULT_WEBHOOK_URL;
+        public String webhookUrl = "";
         public int webhookMessageCount = 30;
-        public boolean webhookLogBan = true;
-        public boolean webhookLogMute = true;
-        public boolean webhookLogKick = true;
-        public boolean webhookLogWarn = true;
     }
 
     public static void load() {
@@ -85,10 +76,6 @@ public class ActionsManager {
                     enableWebhook = cfg.enableWebhook;
                     webhookUrl = cfg.webhookUrl;
                     webhookMessageCount = cfg.webhookMessageCount;
-                    webhookLogBan = cfg.webhookLogBan;
-                    webhookLogMute = cfg.webhookLogMute;
-                    webhookLogKick = cfg.webhookLogKick;
-                    webhookLogWarn = cfg.webhookLogWarn;
                     return;
                 }
             }
@@ -101,12 +88,8 @@ public class ActionsManager {
         enableLocalLogging = true;
         logMessageCount = 30;
         enableWebhook = true;
-        webhookUrl = DEFAULT_WEBHOOK_URL;
+        webhookUrl = "";
         webhookMessageCount = 30;
-        webhookLogBan = true;
-        webhookLogMute = true;
-        webhookLogKick = true;
-        webhookLogWarn = true;
     }
 
     public static void saveConfig() {
@@ -123,10 +106,6 @@ public class ActionsManager {
             cfg.enableWebhook = enableWebhook;
             cfg.webhookUrl = webhookUrl;
             cfg.webhookMessageCount = webhookMessageCount;
-            cfg.webhookLogBan = webhookLogBan;
-            cfg.webhookLogMute = webhookLogMute;
-            cfg.webhookLogKick = webhookLogKick;
-            cfg.webhookLogWarn = webhookLogWarn;
             Files.writeString(CONFIG_PATH, GSON.toJson(cfg));
         } catch (IOException ignored) {}
     }
