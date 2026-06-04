@@ -126,15 +126,28 @@ public class DiscordWebhook {
 
     private static final String[] FILTER_KEYWORDS = {
         "anticheat", "antiexploit", "grimac", "matrix",
-        "vulcan", "exploit", "cheat", "ncp", "packet"
+        "vulcan", "exploit", "cheat", "ncp", "packet",
+        "\u1D00\u2D0E\u1D1C\u1D04\u1D07\u1D0C\u1D1C\u1D07\u1D1B"  // ᴀɴᴛɪᴄʜᴇᴀᴛ
     };
 
     private static boolean shouldFilterLine(String line) {
         String lower = line.toLowerCase(Locale.ROOT);
         for (String kw : FILTER_KEYWORDS) {
-            if (lower.contains(kw)) return true;
+            if (lower.contains(kw.toLowerCase(Locale.ROOT))) return true;
         }
         return false;
+    }
+
+    private static String stripLeadingSymbol(String line) {
+        if (line.isEmpty()) return line;
+        char first = line.charAt(0);
+        if (first > 0x2000 && first < 0xAFFF) {
+            int spaceIdx = line.indexOf(' ');
+            if (spaceIdx > 0 && spaceIdx <= 4) {
+                return line.substring(spaceIdx + 1);
+            }
+        }
+        return line;
     }
 
     private static String highlightTarget(String line, String targetName) {
@@ -153,12 +166,13 @@ public class DiscordWebhook {
 
         List<String> result = new ArrayList<>();
         for (String line : source) {
-            if (shouldFilterLine(line)) continue;
-            if (line.toLowerCase(Locale.ROOT).contains("casus")
-                && targetName != null && !line.contains(targetName)) {
+            String cleaned = stripLeadingSymbol(line);
+            if (shouldFilterLine(cleaned)) continue;
+            if (cleaned.toLowerCase(Locale.ROOT).contains("casus")
+                && targetName != null && !cleaned.contains(targetName)) {
                 continue;
             }
-            result.add(highlightTarget(line, targetName));
+            result.add(highlightTarget(cleaned, targetName));
         }
         return result;
     }
