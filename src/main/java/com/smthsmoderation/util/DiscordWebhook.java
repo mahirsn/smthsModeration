@@ -126,7 +126,10 @@ public class DiscordWebhook {
 
     private static final String[] FILTER_KEYWORDS = {
         "anticheat", "antiexploit", "antieploit", "lpx",
-        "grimac", "matrix", "vulcan", "exploit", "cheat", "ncp", "packet"
+        "grimac", "matrix", "vulcan", "exploit", "cheat", "ncp", "packet",
+        "version", "update", "release", "outdated", "download",
+        "yeni s\u00FCr\u00FCm", "yeni bir s\u00FCr\u00FCm",
+        "web chat:", "available at"
     };
 
     private static boolean hasBoxDrawing(String line) {
