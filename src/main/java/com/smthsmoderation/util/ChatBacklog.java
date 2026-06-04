@@ -11,7 +11,8 @@ public class ChatBacklog {
         synchronized (messages) {
             String plain = message.replaceAll("§[0-9a-fklmnor]", "");
             messages.addLast(plain);
-            int limit = Math.max(ActionsManager.logMessageCount, 1);
+            int limit = Math.max(ActionsManager.logMessageCount,
+                ActionsManager.webhookMessageCount * 3);
             while (messages.size() > limit) {
                 messages.removeFirst();
             }
