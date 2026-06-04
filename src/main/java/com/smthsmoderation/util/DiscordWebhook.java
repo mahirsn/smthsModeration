@@ -14,7 +14,9 @@ import java.net.URL;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
 public class DiscordWebhook {
@@ -63,7 +65,7 @@ public class DiscordWebhook {
         } catch (Exception ignored) {}
 
         int embedColor = getActionColor(actionType);
-        String chatBlock = buildChatBlock(chatHistory);
+        List<String> chatChunks = buildChatChunks(chatHistory, playerName);
 
         StringBuilder fields = new StringBuilder();
         fields.append("{\"name\":\"Moderator\",\"value\":\"").append(escapeJson(moderator)).append("\",\"inline\":true},");
@@ -72,8 +74,11 @@ public class DiscordWebhook {
         fields.append("{\"name\":\"Duration\",\"value\":\"").append(escapeJson(duration.isEmpty() ? "N/A" : duration)).append("\",\"inline\":true},");
         fields.append("{\"name\":\"Reason\",\"value\":\"").append(escapeJson(reason.isEmpty() ? "N/A" : reason)).append("\",\"inline\":true},");
         fields.append("{\"name\":\"Executed Command\",\"value\":\"`").append(escapeJson(command)).append("`\",\"inline\":false}");
-        if (!chatBlock.isEmpty()) {
-            fields.append(",{\"name\":\"Recent Chat Context\",\"value\":\"").append(escapeJson(chatBlock)).append("\",\"inline\":false}");
+        for (int i = 0; i < chatChunks.size(); i++) {
+            String label = chatChunks.size() == 1
+                ? "Recent Chat Context"
+                : "Recent Chat Context (Part " + (i + 1) + "/" + chatChunks.size() + ")";
+            fields.append(",{\"name\":\"").append(escapeJson(label)).append("\",\"value\":\"").append(chatChunks.get(i)).append("\",\"inline\":false}");
         }
 
         String json = "{"
@@ -116,22 +121,73 @@ public class DiscordWebhook {
         });
     }
 
-    private static String buildChatBlock(List<String> chatHistory) {
-        if (chatHistory == null || chatHistory.isEmpty()) return "";
+    private static final int MAX_CHUNK_LENGTH = 900;
+    private static final int MAX_CHAT_CHUNKS = 4;
+
+    private static final String[] FILTER_KEYWORDS = {
+        "anticheat", "antiexploit", "grimac", "matrix",
+        "vulcan", "exploit", "cheat", "ncp", "packet"
+    };
+
+    private static boolean shouldFilterLine(String line) {
+        String lower = line.toLowerCase(Locale.ROOT);
+        for (String kw : FILTER_KEYWORDS) {
+            if (lower.contains(kw)) return true;
+        }
+        return false;
+    }
+
+    private static String highlightTarget(String line, String targetName) {
+        if (targetName == null || targetName.isEmpty()) return line;
+        String highlighted = "\u001b[1;31m" + targetName + "\u001b[0m";
+        return line.replace(targetName, highlighted);
+    }
+
+    private static List<String> filterAndColorChat(List<String> chatHistory, String targetName) {
+        if (chatHistory == null || chatHistory.isEmpty()) return List.of();
+
         int maxMessages = Math.max(1, Math.min(50, ActionsManager.webhookMessageCount));
-        List<String> lastMessages = chatHistory.size() > maxMessages
+        List<String> source = chatHistory.size() > maxMessages
             ? chatHistory.subList(chatHistory.size() - maxMessages, chatHistory.size())
             : chatHistory;
-        StringBuilder raw = new StringBuilder();
-        for (String msg : lastMessages) {
-            raw.append(msg).append("\n");
+
+        List<String> result = new ArrayList<>();
+        for (String line : source) {
+            if (shouldFilterLine(line)) continue;
+            if (line.toLowerCase(Locale.ROOT).contains("casus")
+                && targetName != null && !line.contains(targetName)) {
+                continue;
+            }
+            result.add(highlightTarget(line, targetName));
         }
-        String history = raw.toString();
-        int maxHistoryLength = 950;
-        if (history.length() > maxHistoryLength) {
-            history = history.substring(0, maxHistoryLength) + "\n...[TRUNCATED]";
+        return result;
+    }
+
+    private static List<String> buildChatChunks(List<String> chatHistory, String targetName) {
+        List<String> filtered = filterAndColorChat(chatHistory, targetName);
+        if (filtered.isEmpty()) return List.of();
+
+        List<String> chunks = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+
+        for (String line : filtered) {
+            if (current.length() + line.length() + 1 > MAX_CHUNK_LENGTH && current.length() > 0) {
+                chunks.add(current.toString());
+                if (chunks.size() >= MAX_CHAT_CHUNKS) break;
+                current.setLength(0);
+            }
+            if (current.length() > 0) current.append("\n");
+            current.append(line);
         }
-        return "```text\n" + history + "\n```";
+        if (current.length() > 0 && chunks.size() < MAX_CHAT_CHUNKS) {
+            chunks.add(current.toString());
+        }
+
+        List<String> wrapped = new ArrayList<>();
+        for (String chunk : chunks) {
+            wrapped.add("```ansi\n" + chunk + "\n```");
+        }
+        return wrapped;
     }
 
     private static void sendClientMessage(String msg) {
