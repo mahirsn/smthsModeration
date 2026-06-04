@@ -78,7 +78,7 @@ public class DiscordWebhook {
             String label = chatChunks.size() == 1
                 ? "Recent Chat Context"
                 : "Recent Chat Context (Part " + (i + 1) + "/" + chatChunks.size() + ")";
-            fields.append(",{\"name\":\"").append(escapeJson(label)).append("\",\"value\":\"").append(chatChunks.get(i)).append("\",\"inline\":false}");
+            fields.append(",{\"name\":\"").append(escapeJson(label)).append("\",\"value\":\"").append(escapeJson(chatChunks.get(i))).append("\",\"inline\":false}");
         }
 
         String json = "{"
