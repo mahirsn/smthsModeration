@@ -125,27 +125,92 @@ public class DiscordWebhook {
     private static final int MAX_CHAT_CHUNKS = 4;
 
     private static final String[] FILTER_KEYWORDS = {
-        "anticheat", "antiexploit", "grimac", "matrix",
-        "vulcan", "exploit", "cheat", "ncp", "packet",
-        "\u1D00\u2D0E\u1D1C\u1D04\u1D07\u1D0C\u1D1C\u1D07\u1D1B"  // ᴀɴᴛɪᴄʜᴇᴀᴛ
+        "anticheat", "antiexploit", "antieploit", "lpx",
+        "grimac", "matrix", "vulcan", "exploit", "cheat", "ncp", "packet"
     };
 
-    private static boolean shouldFilterLine(String line) {
-        String lower = line.toLowerCase(Locale.ROOT);
+    private static boolean hasBoxDrawing(String line) {
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c >= 0x2500 && c <= 0x257F) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasYiSymbol(String line) {
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c >= 0xA000 && c <= 0xAFFF) return true;
+        }
+        return false;
+    }
+
+    private static String normalizeSmallCaps(String text) {
+        StringBuilder sb = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c >= '\u1D00' && c <= '\u1D25') sb.append((char) (c - '\u1D00' + 'A'));
+            else if (c >= '\u1D2C' && c <= '\u1D2F') sb.append((char) (c - '\u1D2C' + 'B'));
+            else if (c == '\u1D30') sb.append('D');
+            else if (c == '\u1D31') sb.append('E');
+            else if (c >= '\u1D33' && c <= '\u1D34') sb.append((char) (c - '\u1D33' + 'G'));
+            else if (c == '\u1D39') sb.append('M');
+            else if (c == '\u1D3D') sb.append('O');
+            else if (c >= '\u1D3E' && c <= '\u1D3F') sb.append((char) (c - '\u1D3E' + 'P'));
+            else if (c == '\u1D40') sb.append('R');
+            else if (c >= '\u1D42' && c <= '\u1D4A') {
+                if (c == '\u1D42') sb.append('W');
+                else if (c == '\u1D43') sb.append('a');
+                else if (c >= '\u1D47' && c <= '\u1D49') sb.append((char) (c - '\u1D47' + 'b'));
+                else if (c == '\u1D4A') sb.append('e');
+            }
+            else if (c >= '\u1D4D' && c <= '\u1D4F') {
+                if (c == '\u1D4D') sb.append('k');
+                else if (c == '\u1D4F') sb.append('o');
+            }
+            else if (c == '\u1D50') sb.append('m');
+            else if (c == '\u1D52') sb.append('p');
+            else if (c == '\u1D57') sb.append('t');
+            else if (c == '\u1D58') sb.append('u');
+            else if (c == '\u1D5B') sb.append('v');
+            else if (c >= '\u1D9C' && c <= '\u1D9F') {
+                if (c == '\u1D9C') sb.append('c');
+                else if (c == '\u1D9F') sb.append('f');
+            }
+            else if (c == '\u1DA0') sb.append('f');
+            else if (c == '\u2090') sb.append('a');
+            else if (c == '\u2091') sb.append('e');
+            else if (c == '\u2092') sb.append('o');
+            else if (c == '\u2095') sb.append('h');
+            else if (c == '\u2096') sb.append('k');
+            else if (c == '\u2097') sb.append('l');
+            else if (c == '\u2098') sb.append('m');
+            else if (c == '\u2099') sb.append('n');
+            else if (c == '\u209A') sb.append('p');
+            else if (c == '\u209B') sb.append('s');
+            else if (c == '\u209C') sb.append('t');
+            else sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    private static boolean shouldFilterLine(String normalized) {
+        String lower = normalized.toLowerCase(Locale.ROOT);
         for (String kw : FILTER_KEYWORDS) {
-            if (lower.contains(kw.toLowerCase(Locale.ROOT))) return true;
+            if (lower.contains(kw)) return true;
         }
         return false;
     }
 
     private static String stripLeadingSymbol(String line) {
         if (line.isEmpty()) return line;
-        char first = line.charAt(0);
-        if (first > 0x2000 && first < 0xAFFF) {
-            int spaceIdx = line.indexOf(' ');
-            if (spaceIdx > 0 && spaceIdx <= 4) {
-                return line.substring(spaceIdx + 1);
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c >= 0xA000 && c <= 0xAFFF) {
+                continue;
             }
+            if (c == ' ') return line.substring(i + 1);
+            if (c != ' ') return line.substring(i);
         }
         return line;
     }
@@ -166,13 +231,22 @@ public class DiscordWebhook {
 
         List<String> result = new ArrayList<>();
         for (String line : source) {
-            String cleaned = stripLeadingSymbol(line);
-            if (shouldFilterLine(cleaned)) continue;
-            if (cleaned.toLowerCase(Locale.ROOT).contains("casus")
-                && targetName != null && !cleaned.contains(targetName)) {
+            if (hasBoxDrawing(line)) continue;
+
+            String stripped = hasYiSymbol(line) ? stripLeadingSymbol(line) : line;
+
+            String normalized = normalizeSmallCaps(stripped);
+            if (shouldFilterLine(normalized)) continue;
+
+            String lowerNorm = normalized.toLowerCase(Locale.ROOT);
+            if (lowerNorm.contains("casus")
+                && targetName != null && !normalized.contains(targetName)) {
                 continue;
             }
-            result.add(highlightTarget(cleaned, targetName));
+
+            if (!normalized.contains(":") && !normalized.contains("->")) continue;
+
+            result.add(highlightTarget(normalized, targetName));
         }
         return result;
     }
