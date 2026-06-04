@@ -224,13 +224,9 @@ public class DiscordWebhook {
     private static List<String> filterAndColorChat(List<String> chatHistory, String targetName) {
         if (chatHistory == null || chatHistory.isEmpty()) return List.of();
 
-        int maxMessages = Math.max(1, Math.min(50, ActionsManager.webhookMessageCount));
-        List<String> source = chatHistory.size() > maxMessages
-            ? chatHistory.subList(chatHistory.size() - maxMessages, chatHistory.size())
-            : chatHistory;
-
-        List<String> result = new ArrayList<>();
-        for (String line : source) {
+        List<String> cleanList = new ArrayList<>();
+        for (String line : chatHistory) {
+            if (line.contains("\u00BB")) continue;
             if (hasBoxDrawing(line)) continue;
 
             String stripped = hasYiSymbol(line) ? stripLeadingSymbol(line) : line;
@@ -246,9 +242,14 @@ public class DiscordWebhook {
 
             if (!normalized.contains(":") && !normalized.contains("->")) continue;
 
-            result.add(highlightTarget(normalized, targetName));
+            cleanList.add(highlightTarget(normalized, targetName));
         }
-        return result;
+
+        int maxMessages = Math.max(1, Math.min(50, ActionsManager.webhookMessageCount));
+        if (cleanList.size() > maxMessages) {
+            return cleanList.subList(cleanList.size() - maxMessages, cleanList.size());
+        }
+        return cleanList;
     }
 
     private static List<String> buildChatChunks(List<String> chatHistory, String targetName) {
