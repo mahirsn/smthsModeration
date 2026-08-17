@@ -1,28 +1,31 @@
 package com.smthsmoderation;
 
+import com.mojang.blaze3d.platform.InputConstants;
+import com.smthsmoderation.chat.ChatBacklog;
 import com.smthsmoderation.config.ActionsManager;
 import com.smthsmoderation.gui.ModerationScreen;
 import com.smthsmoderation.gui.PlayerSelectorScreen;
-import com.smthsmoderation.util.ChatBacklog;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Identifier;
-import static net.minecraft.util.Identifier.of;
-import org.lwjgl.glfw.GLFW;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
 
+/**
+ * Sole entrypoint. Registered only as "client" in fabric.mod.json — this mod
+ * has no server-side behavior, so there is no "main" entrypoint doing
+ * nothing (a prior version shipped one anyway).
+ */
 public class SmthsmoderationModClient implements ClientModInitializer {
 
-    private static final String KEY_OPEN = "key.smthsmoderation.open";
+    private static final String KEY_TRANSLATION = "key.smthsmoderation.open";
 
     @Override
     public void onInitializeClient() {
@@ -30,75 +33,57 @@ public class SmthsmoderationModClient implements ClientModInitializer {
         registerKeybind();
         registerShiftClickHandler();
         registerCommands();
-        registerHistoryInterceptor();
-        registerChatBacklog();
+        registerChatListeners();
     }
 
     private void registerKeybind() {
-        KeyBinding openKey = KeyBindingHelper.registerKeyBinding(
-            new KeyBinding(KEY_OPEN, InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_K, new KeyBinding.Category(of("smthsmoderation", "general")))
-        );
+        KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("smthsmoderation", "general"));
+        KeyMapping openKey = KeyMappingHelper.registerKeyMapping(
+                new KeyMapping(KEY_TRANSLATION, InputConstants.Type.KEYSYM, InputConstants.KEY_K, category));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (ActionsManager.modEnabled && openKey.wasPressed()) {
-                client.setScreen(new PlayerSelectorScreen());
+            while (openKey.consumeClick()) {
+                if (ActionsManager.config.modEnabled) {
+                    client.gui.setScreen(new PlayerSelectorScreen());
+                }
             }
         });
     }
 
     private void registerShiftClickHandler() {
-        UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
-            if (!ActionsManager.modEnabled || !ActionsManager.enableEntityClick || !world.isClient() || !player.isSneaking() || !(entity instanceof PlayerEntity target)) {
-                return ActionResult.PASS;
-            }
+        UseEntityCallback.EVENT.register((player, level, hand, entity, hitResult) -> {
+            boolean eligible = ActionsManager.config.modEnabled && ActionsManager.config.enableEntityClick
+                    && level.isClientSide() && player.isShiftKeyDown() && entity instanceof Player;
+            if (!eligible) return InteractionResult.PASS;
 
+            Player target = (Player) entity;
             String name = target.getGameProfile().name();
-            Identifier skin = Identifier.ofVanilla("textures/entity/steve.png");
-
-            var networkHandler = MinecraftClient.getInstance().getNetworkHandler();
-            if (networkHandler != null) {
-                var entry = networkHandler.getPlayerListEntry(target.getUuid());
-                if (entry != null) {
-                    skin = entry.getSkinTextures().body().texturePath();
-                }
-            }
-
-            MinecraftClient.getInstance().setScreen(new ModerationScreen(name, skin));
-            return ActionResult.SUCCESS;
+            Minecraft.getInstance().gui.setScreen(new ModerationScreen(name, target.getUUID()));
+            return InteractionResult.SUCCESS;
         });
     }
 
     private void registerCommands() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-            dispatcher.register(ClientCommandManager.literal("smthsmoderation")
-                .executes(context -> {
-                    if (!ActionsManager.modEnabled) return 0;
-                    MinecraftClient.getInstance().setScreen(new PlayerSelectorScreen());
-                    return 1;
-                })
-            );
-
-            dispatcher.register(ClientCommandManager.literal("moderate")
-                .executes(context -> {
-                    if (!ActionsManager.modEnabled) return 0;
-                    MinecraftClient.getInstance().setScreen(new PlayerSelectorScreen());
-                    return 1;
-                })
-            );
+            dispatcher.register(ClientCommands.literal("smthsmoderation").executes(this::openPlayerSelector));
+            dispatcher.register(ClientCommands.literal("moderate").executes(this::openPlayerSelector));
         });
     }
 
-    private void registerHistoryInterceptor() {
-        ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
-            if (!overlay && !message.getString().trim().startsWith("➩")) return;
-            ModerationScreen.appendHistoryLine(message);
-        });
+    private int openPlayerSelector(com.mojang.brigadier.context.CommandContext<net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource> context) {
+        if (!ActionsManager.config.modEnabled) return 0;
+        Minecraft.getInstance().gui.setScreen(new PlayerSelectorScreen());
+        return 1;
     }
 
-    private void registerChatBacklog() {
+    private void registerChatListeners() {
         ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
             if (overlay) return;
-            ChatBacklog.push(message.getString());
+            String text = message.getString();
+            ChatBacklog.push(text);
+            if (text.trim().startsWith("➩")) {
+                ModerationScreen.appendHistoryLine(text);
+            }
         });
     }
 }

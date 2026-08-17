@@ -1,91 +1,77 @@
 package com.smthsmoderation.gui;
 
+import com.smthsmoderation.action.CommandTemplate;
+import com.smthsmoderation.action.PenaltyMultiplier;
+import com.smthsmoderation.action.TimeUtils;
+import com.smthsmoderation.chat.ChatBacklog;
 import com.smthsmoderation.config.ActionsManager;
 import com.smthsmoderation.config.CommandVariable;
 import com.smthsmoderation.config.ModerationAction;
-import com.smthsmoderation.util.ChatBacklog;
-import com.smthsmoderation.util.DiscordWebhook;
-import com.smthsmoderation.util.GuiUtil;
-import com.smthsmoderation.util.TimeUtils;
+import com.smthsmoderation.log.PunishmentLogger;
+import com.smthsmoderation.webhook.DiscordWebhook;
 import net.fabricmc.loader.api.FabricLoader;
-import io.wispforest.owo.ui.base.BaseOwoScreen;
-import io.wispforest.owo.ui.component.ButtonComponent;
-import io.wispforest.owo.ui.component.TextBoxComponent;
-import io.wispforest.owo.ui.component.UIComponents;
-import io.wispforest.owo.ui.container.FlowLayout;
-import io.wispforest.owo.ui.container.ScrollContainer;
-import io.wispforest.owo.ui.container.UIContainers;
-import io.wispforest.owo.ui.core.*;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
+
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.UUID;
 
-public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
+/** Main working screen: pick an action, fill its variables, execute, review history. */
+public class ModerationScreen extends Screen {
 
     private static ModerationScreen instance;
 
+    private static final int COLUMN_WIDTH = 230;
+    private static final int COLUMN_GAP = 16;
+    private static final int PANEL_HEIGHT = 340;
+    private static final int PADDING = 14;
+    private static final int HISTORY_LOG_HEIGHT = 176;
+
     private final String playerName;
-    private final Identifier skinTexture;
+    private final UUID playerUuid;
     private final List<ModerationAction> configActions = new ArrayList<>();
     private int selectedIndex = -1;
-
-    private FlowLayout panel;
-    private FlowLayout leftColumn;
-    private FlowLayout rightColumn;
     private ModerationAction currentAction;
-    private ButtonComponent executeBtn;
-    private FlowLayout confirmRow;
-    private FlowLayout variablesSection;
-    private FlowLayout previewSection;
-    private FlowLayout historyContent;
-    private ScrollContainer<FlowLayout> historyLogScroll;
-    private FlowLayout historyLogContent;
+
+    private final Map<String, EditBox> varFields = new HashMap<>();
+    private final List<AbstractWidget> leftDynamicWidgets = new ArrayList<>();
+    private record TextLine(String text, int x, int y, int color) {
+    }
+    private final List<TextLine> leftLabels = new ArrayList<>();
+    private final List<int[]> leftSeparators = new ArrayList<>();
+    private int previewY;
+    private ActionButton executeButton;
+    private ActionButton confirmYes;
+    private ActionButton confirmNo;
     private boolean showingConfirmation = false;
-    private boolean isAwaitingHistory = false;
 
+    private boolean awaitingHistory = false;
+    private final List<String> historyLines = new ArrayList<>();
     private final Map<String, Integer> infractionCounts = new HashMap<>();
-    private FlowLayout multiplierResultsContainer;
+    private int historyScrollOffset = 0;
 
-    private final Map<String, TextBoxComponent> varFields = new HashMap<>();
-    private final List<ButtonComponent> actionButtons = new ArrayList<>();
+    private int leftX;
+    private int rightX;
+    private int topY;
+    private int historyLogTop;
 
-
-    // --- Constants ---
-    private static final String HISTORY_COMMAND = "history ";
-
-    public ModerationScreen(String playerName, Identifier skinTexture) {
+    public ModerationScreen(String playerName, UUID playerUuid) {
+        super(Component.literal("Moderate " + playerName));
         this.playerName = playerName;
-        this.skinTexture = skinTexture;
+        this.playerUuid = playerUuid;
         instance = this;
-        loadActions();
-    }
-
-    @Override
-    public void close() {
-        isAwaitingHistory = false;
-        infractionCounts.clear();
-        instance = null;
-        super.close();
-    }
-
-    private void loadActions() {
-        configActions.clear();
-        configActions.addAll(ActionsManager.actions);
-        configActions.removeIf(a -> !a.isVisible);
+        configActions.addAll(ActionsManager.actions.stream().filter(a -> a.isVisible).toList());
         if (!configActions.isEmpty()) {
             selectedIndex = 0;
             currentAction = configActions.get(0);
@@ -93,213 +79,201 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     @Override
-    protected @NotNull OwoUIAdapter<FlowLayout> createAdapter() {
-        return OwoUIAdapter.create(this, UIContainers::verticalFlow);
+    protected void init() {
+        leftX = (this.width - (COLUMN_WIDTH * 2 + COLUMN_GAP)) / 2;
+        rightX = leftX + COLUMN_WIDTH + COLUMN_GAP;
+        topY = (this.height - PANEL_HEIGHT) / 2;
+
+        rebuildLeftColumn();
     }
 
     @Override
-    protected void build(FlowLayout root) {
-        root.surface(Surface.VANILLA_TRANSLUCENT);
-        root.alignment(HorizontalAlignment.CENTER, VerticalAlignment.CENTER);
-
-        panel = UIContainers.horizontalFlow(Sizing.content(), Sizing.content());
-        panel.gap(12);
-
-        leftColumn = UIContainers.verticalFlow(Sizing.fixed(220), Sizing.content());
-        leftColumn.surface(Surface.flat(GuiUtil.PANEL_BG));
-        leftColumn.padding(Insets.of(12));
-        leftColumn.gap(6);
-
-        buildHeader(leftColumn);
-        buildActionButtons(leftColumn);
-        buildVariableFields(leftColumn);
-
-        previewSection = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
-        leftColumn.child(previewSection);
-
-        confirmRow = createConfirmRow();
-        buildExecuteButton(leftColumn);
-        buildHistoryButton(leftColumn);
-
-        historyContent = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
-        historyContent.gap(2);
-        leftColumn.child(historyContent);
-
-        rightColumn = UIContainers.verticalFlow(Sizing.fixed(220), Sizing.content());
-        rightColumn.surface(Surface.flat(GuiUtil.PANEL_BG));
-        rightColumn.padding(Insets.of(12));
-        rightColumn.gap(4);
-        rightColumn.child(UIComponents.label(Text.literal("§6§lHistory")));
-
-        historyLogContent = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
-        historyLogContent.gap(2);
-        historyLogScroll = UIContainers.verticalScroll(Sizing.fill(), Sizing.fixed(180), historyLogContent);
-        rightColumn.child(historyLogScroll);
-
-        multiplierResultsContainer = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
-        multiplierResultsContainer.gap(2);
-        rightColumn.child(multiplierResultsContainer);
-
-        panel.child(leftColumn);
-        panel.child(rightColumn);
-
-        root.child(panel);
-        refreshVariables();
-        updatePreview();
-        updateExecuteButton();
+    public void onClose() {
+        awaitingHistory = false;
+        infractionCounts.clear();
+        instance = null;
+        super.onClose();
     }
 
-    private void buildHeader(FlowLayout panel) {
-        FlowLayout header = UIContainers.horizontalFlow(Sizing.fill(), Sizing.content());
-        header.gap(8);
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        graphics.fill(0, 0, this.width, this.height, 0x80000000);
+        GuiUtil.drawPanel(graphics, leftX, topY, COLUMN_WIDTH, PANEL_HEIGHT);
+        GuiUtil.drawPanel(graphics, rightX, topY, COLUMN_WIDTH, PANEL_HEIGHT);
 
-        header.child(UIComponents.texture(skinTexture, 8, 8, 8, 8, 64, 64)
-            .sizing(Sizing.fixed(22), Sizing.fixed(22)));
+        graphics.blit(RenderPipelines.GUI_TEXTURED, PlayerSkins.resolve(playerUuid), leftX + PADDING, topY + PADDING, 8, 8, 20, 20, 8, 8, 64, 64);
+        graphics.text(this.font, playerName, leftX + PADDING + 28, topY + PADDING + 5, GuiUtil.TEXT_PRIMARY, false);
 
-        ButtonComponent nameBtn = UIComponents.button(
-            Text.literal("§lModerate: " + playerName),
-            button -> MinecraftClient.getInstance().setScreen(new PlayerSelectorScreen())
-        );
-        nameBtn.renderer(GuiUtil.modernButton(GuiUtil.DARK_BG, GuiUtil.DARK_BG_HOVER, GuiUtil.DISABLED));
-        nameBtn.sizing(Sizing.fill(), Sizing.content());
-        header.child(nameBtn);
-
-        panel.child(header);
-    }
-
-    private void buildActionButtons(FlowLayout panel) {
-        if (configActions.isEmpty()) return;
-
-        var actionFlow = UIContainers.ltrTextFlow(Sizing.fill(100), Sizing.content());
-        actionFlow.gap(4);
-        actionFlow.margins(Insets.vertical(2));
-
-        actionButtons.clear();
-        for (int i = 0; i < configActions.size(); i++) {
-            int idx = i;
-            ModerationAction action = configActions.get(i);
-            int color = action.getColor();
-            int hover = action.getHoverColor();
-
-            ButtonComponent btn = UIComponents.button(
-                Text.literal(action.type),
-                b -> selectAction(idx)
-            );
-            btn.renderer(GuiUtil.modernButton(color, hover, GuiUtil.DISABLED));
-
-            var tr = MinecraftClient.getInstance().textRenderer;
-            int btnW = tr.getWidth(Text.literal(action.type)) + 12;
-            btn.sizing(Sizing.fixed(btnW), Sizing.fixed(20));
-            btn.margins(Insets.of(2));
-
-            if (action.description != null && !action.description.isEmpty()) {
-                btn.tooltip(Text.literal(action.description));
-            }
-
-            actionFlow.child(btn);
-            actionButtons.add(btn);
+        for (int[] sep : leftSeparators) {
+            graphics.fill(sep[0], sep[1], sep[0] + sep[2], sep[1] + 1, GuiUtil.PANEL_BORDER);
+        }
+        for (TextLine label : leftLabels) {
+            graphics.text(this.font, label.text(), label.x(), label.y(), label.color(), false);
+        }
+        if (currentAction != null) {
+            String preview = CommandTemplate.preview(currentAction.commandTemplate, playerName, currentVariableValues());
+            graphics.text(this.font, "Preview", leftX + PADDING, previewY, GuiUtil.TEXT_MUTED, false);
+            graphics.text(this.font, preview, leftX + PADDING, previewY + 10, GuiUtil.TEXT_PRIMARY, false);
         }
 
-        updateActionSelection();
-        panel.child(actionFlow);
+        graphics.text(this.font, "History", rightX + PADDING, topY + PADDING - 2, GuiUtil.TEXT_PRIMARY, false);
+        renderHistoryLog(graphics);
+        renderMultiplierResults(graphics);
+
+        super.extractRenderState(graphics, mouseX, mouseY, delta);
     }
 
-    private void updateActionSelection() {
-        for (int i = 0; i < actionButtons.size(); i++) {
-            ButtonComponent btn = actionButtons.get(i);
-            if (i == selectedIndex) {
-                btn.renderer(GuiUtil.outlinedButton(
-                    configActions.get(i).getColor(),
-                    configActions.get(i).getHoverColor(),
-                    GuiUtil.DISABLED,
-                    0xFFFFFFFF
-                ));
-            } else {
-                btn.renderer(GuiUtil.modernButton(
-                    configActions.get(i).getColor(),
-                    configActions.get(i).getHoverColor(),
-                    GuiUtil.DISABLED
-                ));
-            }
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        boolean overHistory = mouseX >= rightX && mouseX <= rightX + COLUMN_WIDTH
+                && mouseY >= historyLogTop && mouseY <= historyLogTop + HISTORY_LOG_HEIGHT;
+        if (overHistory) {
+            int maxOffset = Math.max(0, historyLines.size() - (HISTORY_LOG_HEIGHT / this.font.lineHeight));
+            historyScrollOffset = Math.clamp(historyScrollOffset - (int) Math.signum(scrollY), 0, maxOffset);
+            return true;
         }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
-    private void buildVariableFields(FlowLayout panel) {
-        variablesSection = UIContainers.verticalFlow(Sizing.fill(), Sizing.content());
-        variablesSection.gap(3);
-        panel.child(variablesSection);
-    }
+    // --- Left column: header, actions, variables, execute, history button ---
 
-    private void refreshVariables() {
-        variablesSection.clearChildren();
+    private void rebuildLeftColumn() {
+        leftDynamicWidgets.forEach(this::removeWidget);
+        leftDynamicWidgets.clear();
         varFields.clear();
+        leftLabels.clear();
+        leftSeparators.clear();
 
-        if (currentAction == null) return;
+        int y = topY + PADDING + 24;
+        addWidget(new ActionButton(this.font, leftX + PADDING, y, COLUMN_WIDTH - PADDING * 2, 16,
+                Component.literal("Change target"), GuiUtil.SURFACE,
+                () -> Minecraft.getInstance().gui.setScreen(new PlayerSelectorScreen())), y, 16);
+        y += 16;
+        y = separator(y, 10);
 
-        for (CommandVariable var : currentAction.variables) {
-            variablesSection.child(UIComponents.label(Text.literal("§7" + var.name + ":")));
+        y = layoutActionButtons(y);
+        y = separator(y, 10);
 
-            TextBoxComponent field = UIComponents.textBox(Sizing.fixed(120), "");
-            field.setMaxLength(64);
-            field.onChanged().subscribe(text -> { updatePreview(); updateExecuteButton(); });
-            variablesSection.child(field);
-            varFields.put(var.name, field);
+        y = layoutVariableFields(y);
+        y += 4;
 
-            List<String> presetList = var.getPresetList();
-            boolean showPM = currentAction.smartMultiplierEnabled
-                    && currentAction.targetVariableForPM.equalsIgnoreCase(var.name);
-            if (!presetList.isEmpty() || showPM) {
-                FlowLayout chipRow = UIContainers.horizontalFlow(Sizing.fill(), Sizing.content());
-                chipRow.gap(4);
-                for (String preset : presetList) {
-                    ButtonComponent chip = UIComponents.button(Text.literal(preset), b -> {
-                        field.text(preset);
-                        updatePreview();
-                        updateExecuteButton();
-                    });
-                    chip.renderer(GuiUtil.modernButton(GuiUtil.DARK_BG, GuiUtil.DARK_BG_HOVER, GuiUtil.DISABLED));
-                    chip.sizing(Sizing.content(), Sizing.fixed(16));
-                    chipRow.child(chip);
-                }
-                if (showPM) {
-                    ButtonComponent pmChip = UIComponents.button(Text.literal("§cPM"), b -> {
-                        double mult = calculateMultiplier(currentAction);
-                        if (mult > 0) {
-                            long baseMinutes = TimeUtils.parseMinutes(currentAction.basePenaltyTime);
-                            long totalMinutes = TimeUtils.multiplyMinutes(baseMinutes, mult);
-                            field.text(TimeUtils.formatMinutes(totalMinutes));
-                        }
-                        updatePreview();
-                        updateExecuteButton();
-                    });
-                    pmChip.renderer(GuiUtil.modernButton(GuiUtil.DARK_BG, GuiUtil.DARK_BG_HOVER, GuiUtil.DISABLED));
-                    pmChip.sizing(Sizing.content(), Sizing.fixed(16));
-                    chipRow.child(pmChip);
-                }
-                variablesSection.child(chipRow);
-            }
+        previewY = y;
+        y += 22;
+        y = separator(y, 10);
+
+        y = layoutExecuteArea(y);
+        y += 8;
+
+        if (ActionsManager.config.showHistoryButton) {
+            addWidget(new ActionButton(this.font, leftX + PADDING, y, COLUMN_WIDTH - PADDING * 2, 18,
+                    Component.literal("Show History"), GuiUtil.SURFACE, this::requestHistory), y, 18);
         }
+
+        historyLogTop = topY + PADDING + 20;
+        updateExecuteButtonState();
     }
 
-    private void updatePreview() {
-        previewSection.clearChildren();
-        if (currentAction == null) return;
+    private int separator(int y, int gapAfter) {
+        leftSeparators.add(new int[]{leftX + PADDING, y + 4, COLUMN_WIDTH - PADDING * 2});
+        return y + 4 + 1 + gapAfter;
+    }
 
-        String preview = currentAction.commandTemplate
-            .replaceAll("(?i)%player%", Matcher.quoteReplacement(playerName));
-
-        for (Map.Entry<String, TextBoxComponent> e : varFields.entrySet()) {
-            String val = e.getValue().getText().trim();
-            if (!val.isEmpty()) {
-                preview = preview.replaceAll(
-                    "(?i)%" + Pattern.quote(e.getKey()) + "%",
-                    Matcher.quoteReplacement(val)
-                );
+    private int layoutActionButtons(int startY) {
+        int x = leftX + PADDING;
+        int y = startY;
+        int rowHeight = 20;
+        for (int i = 0; i < configActions.size(); i++) {
+            ModerationAction action = configActions.get(i);
+            int width = this.font.width(action.type) + 14;
+            if (x + width > leftX + COLUMN_WIDTH - PADDING) {
+                x = leftX + PADDING;
+                y += rowHeight + 5;
             }
+            int index = i;
+            ActionButton button = new ActionButton(this.font, x, y, width, rowHeight - 2,
+                    Component.literal(action.type), action.getColor(), () -> selectAction(index));
+            button.setSelected(i == selectedIndex);
+            if (action.description != null && !action.description.isEmpty()) {
+                button.setTooltip(Tooltip.create(Component.literal(action.description)));
+            }
+            addWidget(button, y, rowHeight);
+            x += width + 5;
         }
-        preview = preview.replaceAll("%[^%]+%", "...");
+        return y + rowHeight;
+    }
 
-        previewSection.child(UIComponents.label(Text.literal("§7Preview: §f" + preview)));
+    private int layoutVariableFields(int startY) {
+        if (currentAction == null) return startY;
+        int y = startY;
+        for (CommandVariable variable : currentAction.variables) {
+            leftLabels.add(new TextLine(variable.name, leftX + PADDING, y, GuiUtil.TEXT_MUTED));
+            y += 11;
+            EditBox field = new EditBox(this.font, leftX + PADDING, y, 130, 16, Component.literal(variable.name));
+            field.setMaxLength(64);
+            field.setResponder(text -> updateExecuteButtonState());
+            addWidget(field, y, 16);
+            varFields.put(variable.name, field);
+            y += 20;
+
+            List<String> presets = variable.getPresetList();
+            boolean showPenaltyChip = currentAction.smartMultiplierEnabled
+                    && currentAction.targetVariableForPM.equalsIgnoreCase(variable.name);
+            if (!presets.isEmpty() || showPenaltyChip) {
+                int chipX = leftX + PADDING;
+                for (String preset : presets) {
+                    int chipWidth = this.font.width(preset) + 8;
+                    ActionButton chip = new ActionButton(this.font, chipX, y, chipWidth, 14,
+                            Component.literal(preset), GuiUtil.SURFACE, () -> field.setValue(preset));
+                    addWidget(chip, y, 14);
+                    chipX += chipWidth + 4;
+                }
+                if (showPenaltyChip) {
+                    int chipWidth = this.font.width("PM") + 8;
+                    ActionButton pmChip = new ActionButton(this.font, chipX, y, chipWidth, 14,
+                            Component.literal("PM"), 0xFFB33A3A, () -> applyPenaltyMultiplier(field));
+                    addWidget(pmChip, y, 14);
+                }
+                y += 19;
+            }
+            y += 4;
+        }
+        return y;
+    }
+
+    private void applyPenaltyMultiplier(EditBox field) {
+        int count = infractionCounts.getOrDefault(currentAction.type, 0);
+        long minutes = PenaltyMultiplier.applyToBaseDuration(currentAction.basePenaltyTime, count,
+                currentAction.multiplierStep, currentAction.multiplierMax);
+        if (minutes > 0) field.setValue(TimeUtils.formatMinutes(minutes));
+        updateExecuteButtonState();
+    }
+
+    private int layoutExecuteArea(int startY) {
+        executeButton = new ActionButton(this.font, leftX + PADDING, startY, COLUMN_WIDTH - PADDING * 2, 22,
+                Component.literal("Execute"), 0xFF3E7D44, this::onExecutePressed);
+        addWidget(executeButton, startY, 22);
+
+        int halfWidth = (COLUMN_WIDTH - PADDING * 2 - 6) / 2;
+        confirmYes = new ActionButton(this.font, leftX + PADDING, startY, halfWidth, 22,
+                Component.literal("Confirm"), 0xFF3E7D44, () -> {
+            showingConfirmation = false;
+            executeCurrentAction();
+            updateExecuteButtonState();
+        });
+        confirmNo = new ActionButton(this.font, leftX + PADDING + halfWidth + 6, startY, halfWidth, 22,
+                Component.literal("Cancel"), 0xFFB33A3A, () -> {
+            showingConfirmation = false;
+            updateExecuteButtonState();
+        });
+        addWidget(confirmYes, startY, 22);
+        addWidget(confirmNo, startY, 22);
+        return startY + 22;
+    }
+
+    private int addWidget(AbstractWidget widget, int y, int height) {
+        leftDynamicWidgets.add(widget);
+        this.addRenderableWidget(widget);
+        return y;
     }
 
     private void selectAction(int index) {
@@ -308,216 +282,126 @@ public class ModerationScreen extends BaseOwoScreen<FlowLayout> {
         currentAction = configActions.get(index);
         showingConfirmation = false;
         infractionCounts.clear();
-
-        updateActionSelection();
-        refreshVariables();
-        updatePreview();
-        updateExecuteButton();
-        updateMultiplierDisplay();
+        rebuildLeftColumn();
     }
 
-    private FlowLayout createConfirmRow() {
-        FlowLayout row = UIContainers.horizontalFlow(Sizing.fill(), Sizing.content());
-        row.gap(6);
-        row.child(UIComponents.label(Text.literal("§eConfirm action?")));
-        ButtonComponent yesBtn = UIComponents.button(Text.literal("§aYes"), b -> {
+    private void onExecutePressed() {
+        if (currentAction == null) return;
+        if (currentAction.requiresConfirmation && !showingConfirmation) {
+            showingConfirmation = true;
+        } else {
             showingConfirmation = false;
             executeCurrentAction();
-        });
-        yesBtn.renderer(GuiUtil.modernButton(GuiUtil.GREEN, GuiUtil.GREEN_HOVER, GuiUtil.DISABLED));
-        yesBtn.sizing(Sizing.fixed(50), Sizing.fixed(20));
-        row.child(yesBtn);
-        ButtonComponent noBtn = UIComponents.button(Text.literal("§cNo"), b -> {
-            showingConfirmation = false;
-            updateExecuteButton();
-        });
-        noBtn.renderer(GuiUtil.modernButton(GuiUtil.RED, GuiUtil.RED_HOVER, GuiUtil.DISABLED));
-        noBtn.sizing(Sizing.fixed(50), Sizing.fixed(20));
-        row.child(noBtn);
-        return row;
-    }
-
-    private void buildExecuteButton(FlowLayout panel) {
-        executeBtn = UIComponents.button(
-            Text.literal("§lExecute"),
-            b -> {
-                if (currentAction != null && currentAction.requiresConfirmation && !showingConfirmation) {
-                    showingConfirmation = true;
-                    updateExecuteButton();
-                } else {
-                    showingConfirmation = false;
-                    executeCurrentAction();
-                }
-            }
-        );
-        executeBtn.renderer(GuiUtil.modernButton(GuiUtil.GREEN, GuiUtil.GREEN_HOVER, GuiUtil.DISABLED));
-        executeBtn.sizing(Sizing.fill(), Sizing.fixed(22));
-        panel.child(executeBtn);
-    }
-
-    private void buildHistoryButton(FlowLayout panel) {
-        if (!ActionsManager.showHistoryButton) return;
-        ButtonComponent historyBtn = UIComponents.button(
-            Text.literal("§7Show History"),
-            b -> {
-                isAwaitingHistory = true;
-                infractionCounts.clear();
-                historyLogContent.clearChildren();
-                multiplierResultsContainer.clearChildren();
-                historyLogContent.child(UIComponents.label(Text.literal("§7Fetching history for §f" + playerName + "...")));
-                MinecraftClient client = MinecraftClient.getInstance();
-                if (client.getNetworkHandler() != null) {
-                    client.getNetworkHandler().sendChatCommand(HISTORY_COMMAND + playerName + " " + ActionsManager.historyCommandLimit);
-                }
-            }
-        );
-        historyBtn.renderer(GuiUtil.modernButton(GuiUtil.DARK_BG, GuiUtil.DARK_BG_HOVER, GuiUtil.DISABLED));
-        historyBtn.sizing(Sizing.fill(), Sizing.fixed(20));
-        historyBtn.tooltip(Text.literal("§7View LiteBans history for §f" + playerName));
-        panel.child(historyBtn);
-    }
-
-    public static void appendHistoryLine(Text message) {
-        if (instance != null && instance.isAwaitingHistory && instance.historyLogContent != null) {
-            String raw = message.getString().trim();
-            if (!raw.startsWith("➩")) return;
-            instance.historyLogContent.child(UIComponents.label(message).maxWidth(200));
-
-            String lower = raw.toLowerCase(Locale.ROOT);
-            for (ModerationAction action : instance.configActions) {
-                if (!action.smartMultiplierEnabled) continue;
-                String kw = action.multiplierKeyword.toLowerCase(Locale.ROOT);
-                String rk = action.reductionKeyword.toLowerCase(Locale.ROOT);
-                if (!rk.isEmpty() && lower.contains(rk)) {
-                    instance.infractionCounts.merge(action.type, -1, Integer::sum);
-                } else if (!kw.isEmpty() && lower.contains(kw)) {
-                    instance.infractionCounts.merge(action.type, 1, Integer::sum);
-                }
-            }
-            instance.updateMultiplierDisplay();
         }
+        updateExecuteButtonState();
     }
 
-    private void updateExecuteButton() {
-        if (currentAction == null || executeBtn == null || confirmRow == null) return;
+    private void updateExecuteButtonState() {
+        if (executeButton == null) return;
+        boolean allRequiredFilled = currentAction != null && currentAction.variables.stream()
+                .filter(v -> v.isRequired)
+                .allMatch(v -> varFields.containsKey(v.name) && !varFields.get(v.name).getValue().isBlank());
 
-        boolean canExecute = true;
-        for (CommandVariable var : currentAction.variables) {
-            if (var.isRequired) {
-                TextBoxComponent field = varFields.get(var.name);
-                if (field == null || field.getText().trim().isEmpty()) {
-                    canExecute = false;
-                    break;
-                }
-            }
-        }
+        executeButton.visible = !showingConfirmation;
+        executeButton.active = !showingConfirmation && allRequiredFilled;
+        confirmYes.visible = showingConfirmation;
+        confirmNo.visible = showingConfirmation;
+    }
 
-        if (showingConfirmation) {
-            executeBtn.active = false;
-            if (!confirmRow.hasParent()) {
-                int idx = leftColumn.children().indexOf(executeBtn);
-                if (idx >= 0) leftColumn.child(idx, confirmRow);
-            }
-        } else {
-            executeBtn.active = canExecute;
-            if (confirmRow.hasParent()) {
-                leftColumn.removeChild(confirmRow);
-            }
-        }
+    private Map<String, String> currentVariableValues() {
+        Map<String, String> values = new HashMap<>();
+        varFields.forEach((name, field) -> values.put(name, field.getValue().trim()));
+        return values;
     }
 
     private void executeCurrentAction() {
-        if (currentAction == null || MinecraftClient.getInstance().player == null) return;
+        if (currentAction == null) return;
+        var connection = Minecraft.getInstance().getConnection();
+        if (connection == null) return;
 
-        String command = currentAction.commandTemplate
-            .replaceAll("(?i)%player%", Matcher.quoteReplacement(playerName));
+        Map<String, String> values = currentVariableValues();
+        String command = CommandTemplate.fill(currentAction.commandTemplate, playerName, values);
+        connection.sendCommand(CommandTemplate.stripLeadingSlash(command));
 
-        for (Map.Entry<String, TextBoxComponent> e : varFields.entrySet()) {
-            String val = e.getValue().getText().trim();
-            command = command.replaceAll(
-                "(?i)%" + Pattern.quote(e.getKey()) + "%",
-                Matcher.quoteReplacement(val)
-            );
-        }
-        command = command.replaceAll("%[^%]+%", "");
-
-        MinecraftClient.getInstance().player.networkHandler.sendChatCommand(
-            command.startsWith("/") ? command.substring(1) : command
-        );
-
-        if (ActionsManager.enableLocalLogging) {
-            writePunishmentLog(command);
-        }
-
-        if (ActionsManager.enableWebhook && currentAction.sendWebhook) {
-            String duration = varFields.containsKey("duration") ? varFields.get("duration").getText().trim() : "";
-            String reason = varFields.containsKey("reason") ? varFields.get("reason").getText().trim() : "";
-            List<String> history = new ArrayList<>(ChatBacklog.snapshot());
-            DiscordWebhook.sendEmbed(playerName, currentAction.type, duration, reason,
-                command, currentAction.buttonColor, history);
-        }
-    }
-
-    private void writePunishmentLog(String command) {
-        try {
-            Path logDir = FabricLoader.getInstance().getGameDir().resolve("smthsmoderations-logs");
-            Files.createDirectories(logDir);
-
-            String timestamp = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new Date());
-            String fileName = timestamp + "_" + playerName + ".txt";
-            Path logFile = logDir.resolve(fileName);
-
-            StringBuilder sb = new StringBuilder();
-            sb.append("=== PUNISHMENT LOG ===\n");
-            sb.append("Target Player: ").append(playerName).append("\n");
-            sb.append("Action Type: ").append(currentAction.type).append("\n");
-
-            String duration = varFields.containsKey("duration") ? varFields.get("duration").getText().trim() : "N/A";
-            String reason = varFields.containsKey("reason") ? varFields.get("reason").getText().trim() : "N/A";
-            sb.append("Duration: ").append(duration).append("\n");
-            sb.append("Reason: ").append(reason).append("\n");
-            sb.append("Executed Command: /").append(command).append("\n");
-            sb.append("Date & Time: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())).append("\n");
-            sb.append("\n\n");
-
-            LinkedList<String> backlog = ChatBacklog.snapshot();
-            sb.append("=== RECENT CHAT HISTORY (Last ").append(backlog.size()).append(" messages) ===\n");
-            for (String msg : backlog) {
-                sb.append(msg).append("\n");
+        if (ActionsManager.config.enableLocalLogging) {
+            try {
+                var logDir = FabricLoader.getInstance().getGameDir().resolve("smthsmoderations-logs");
+                PunishmentLogger.write(logDir, playerName, currentAction.type,
+                        values.getOrDefault("duration", ""), values.getOrDefault("reason", ""),
+                        command, ChatBacklog.snapshot(ActionsManager.config.logMessageCount));
+            } catch (IOException e) {
+                var player = Minecraft.getInstance().player;
+                if (player != null) {
+                    player.sendSystemMessage(Component.literal("§c[SmthsModeration] Log write failed: " + e.getMessage()));
+                }
             }
+        }
 
-            Files.writeString(logFile, sb.toString());
-        } catch (IOException ignored) {}
+        if (ActionsManager.config.enableWebhook && currentAction.sendWebhook) {
+            DiscordWebhook.sendEmbed(playerName, currentAction.type, values.getOrDefault("duration", ""),
+                    values.getOrDefault("reason", ""), command, ChatBacklog.snapshot(ActionsManager.config.webhookMessageCount));
+        }
     }
 
-    private double calculateMultiplier(ModerationAction action) {
-        int count = infractionCounts.getOrDefault(action.type, 0);
-        if (count <= 0) return 0.0;
-        double multiplier = 1.0 + (count * action.multiplierStep);
-        return Math.max(1.0, Math.min(multiplier, action.multiplierMax));
+    // --- History panel (right column) ---
+
+    private void requestHistory() {
+        awaitingHistory = true;
+        infractionCounts.clear();
+        historyLines.clear();
+        historyLines.add("Fetching history for " + playerName + "...");
+        var connection = Minecraft.getInstance().getConnection();
+        if (connection != null) {
+            connection.sendCommand("history " + playerName + " " + ActionsManager.config.historyCommandLimit);
+        }
     }
 
-    private void updateMultiplierDisplay() {
-        multiplierResultsContainer.clearChildren();
-        if (currentAction == null || !currentAction.smartMultiplierEnabled
-                || currentAction.multiplierKeyword.isEmpty()) {
-            multiplierResultsContainer.child(UIComponents.label(Text.literal("§7No multipliers active")));
+    public static void appendHistoryLine(String rawMessage) {
+        if (instance == null || !instance.awaitingHistory) return;
+        instance.historyLines.add(rawMessage);
+
+        String lower = rawMessage.toLowerCase(Locale.ROOT);
+        for (ModerationAction action : instance.configActions) {
+            if (!action.smartMultiplierEnabled) continue;
+            String reduceKw = action.reductionKeyword.toLowerCase(Locale.ROOT);
+            String addKw = action.multiplierKeyword.toLowerCase(Locale.ROOT);
+            if (!reduceKw.isEmpty() && lower.contains(reduceKw)) {
+                instance.infractionCounts.merge(action.type, -1, Integer::sum);
+            } else if (!addKw.isEmpty() && lower.contains(addKw)) {
+                instance.infractionCounts.merge(action.type, 1, Integer::sum);
+            }
+        }
+    }
+
+    private void renderHistoryLog(GuiGraphicsExtractor graphics) {
+        int lineHeight = this.font.lineHeight + 2;
+        int visibleLines = HISTORY_LOG_HEIGHT / lineHeight;
+        graphics.enableScissor(rightX + PADDING, historyLogTop, rightX + COLUMN_WIDTH - PADDING, historyLogTop + HISTORY_LOG_HEIGHT);
+        int end = Math.min(historyLines.size(), historyScrollOffset + visibleLines);
+        for (int i = historyScrollOffset; i < end; i++) {
+            int y = historyLogTop + (i - historyScrollOffset) * lineHeight;
+            graphics.text(this.font, historyLines.get(i), rightX + PADDING, y, GuiUtil.TEXT_MUTED, false);
+        }
+        graphics.disableScissor();
+    }
+
+    private void renderMultiplierResults(GuiGraphicsExtractor graphics) {
+        int y = historyLogTop + HISTORY_LOG_HEIGHT + 10;
+        graphics.fill(rightX + PADDING, y - 6, rightX + COLUMN_WIDTH - PADDING, y - 5, GuiUtil.PANEL_BORDER);
+
+        if (currentAction == null || !currentAction.smartMultiplierEnabled || currentAction.multiplierKeyword.isEmpty()) {
+            graphics.text(this.font, "No multipliers active", rightX + PADDING, y, GuiUtil.TEXT_MUTED, false);
             return;
         }
         int count = infractionCounts.getOrDefault(currentAction.type, 0);
         if (count == 0) {
-            multiplierResultsContainer.child(UIComponents.label(Text.literal("§7No multipliers active")));
+            graphics.text(this.font, "No multipliers active", rightX + PADDING, y, GuiUtil.TEXT_MUTED, false);
             return;
         }
-        double mult = calculateMultiplier(currentAction);
-        long baseMinutes = TimeUtils.parseMinutes(currentAction.basePenaltyTime);
-        long totalMinutes = TimeUtils.multiplyMinutes(baseMinutes, mult);
-        String formatted = TimeUtils.formatMinutes(totalMinutes);
-        multiplierResultsContainer.child(UIComponents.label(Text.literal(
-            "§e" + currentAction.type + " §7-> x" + String.format("%.2f", mult)
-            + " §8(" + currentAction.basePenaltyTime + " × " + count + " = §f" + formatted + "§8)"
-        )));
+        double multiplier = PenaltyMultiplier.compute(count, currentAction.multiplierStep, currentAction.multiplierMax);
+        long totalMinutes = TimeUtils.multiplyMinutes(TimeUtils.parseMinutes(currentAction.basePenaltyTime), multiplier);
+        String line = currentAction.type + "  x" + String.format(Locale.ROOT, "%.2f", multiplier)
+                + "  (" + currentAction.basePenaltyTime + " × " + count + " = " + TimeUtils.formatMinutes(totalMinutes) + ")";
+        graphics.text(this.font, line, rightX + PADDING, y, GuiUtil.ACCENT, false);
     }
-
-
 }

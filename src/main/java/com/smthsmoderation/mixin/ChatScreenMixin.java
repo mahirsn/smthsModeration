@@ -2,38 +2,44 @@ package com.smthsmoderation.mixin;
 
 import com.smthsmoderation.config.ActionsManager;
 import com.smthsmoderation.gui.ModerationScreen;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ChatScreen;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.Style;
 import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+/**
+ * Opens {@link ModerationScreen} on Shift+click of a player name in chat.
+ * Player name is read from the clicked component's hover text first, then
+ * from its click-command arguments. Target signature verified against the
+ * real 26.2 Minecraft jar via javap: {@code ChatScreen} declares a private
+ * {@code handleComponentClicked(Style, boolean)} — Mixin can inject into
+ * private methods, so the reduced visibility doesn't matter here.
+ */
 @Mixin(ChatScreen.class)
 public class ChatScreenMixin {
 
-    @Inject(method = "handleClickEvent", at = @At("HEAD"), cancellable = true)
-    private void onHandleClickEvent(Style style, boolean something, CallbackInfoReturnable<Boolean> cir) {
-        if (!ActionsManager.modEnabled || !ActionsManager.enableChatClick || !isShiftDown()) return;
+    @Inject(method = "handleComponentClicked", at = @At("HEAD"), cancellable = true)
+    private void onComponentClicked(Style style, boolean unused, CallbackInfoReturnable<Boolean> cir) {
+        boolean eligible = ActionsManager.config.modEnabled && ActionsManager.config.enableChatClick && isShiftDown();
+        if (!eligible || style == null) return;
 
         String name = extractPlayerName(style);
-        if (name != null && !name.isEmpty()) {
-            Identifier skin = Identifier.ofVanilla("textures/entity/steve.png");
-            MinecraftClient.getInstance().setScreen(new ModerationScreen(name, skin));
+        if (name != null) {
+            Minecraft.getInstance().gui.setScreen(new ModerationScreen(name, null));
             cir.setReturnValue(true);
         }
     }
 
     private boolean isShiftDown() {
-        long handle = MinecraftClient.getInstance().getWindow().getHandle();
+        long handle = Minecraft.getInstance().getWindow().handle();
         return GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS
-            || GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
+                || GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
     }
 
     private String extractPlayerName(Style style) {
@@ -42,26 +48,18 @@ public class ChatScreenMixin {
             if (isValidPlayerName(text)) return text;
         }
 
-        if (style.getClickEvent() != null) {
-            ClickEvent clickEvent = style.getClickEvent();
-            if (clickEvent instanceof ClickEvent.SuggestCommand suggest) {
-                String cmd = suggest.command();
-                String name = extractNameFromCommand(cmd);
-                if (name != null) return name;
-            } else if (clickEvent instanceof ClickEvent.RunCommand run) {
-                String cmd = run.command();
-                String name = extractNameFromCommand(cmd);
-                if (name != null) return name;
-            }
+        if (style.getClickEvent() instanceof ClickEvent.SuggestCommand suggest) {
+            return extractNameFromCommand(suggest.command());
         }
-
+        if (style.getClickEvent() instanceof ClickEvent.RunCommand run) {
+            return extractNameFromCommand(run.command());
+        }
         return null;
     }
 
     private String extractNameFromCommand(String command) {
         if (command == null || command.isEmpty()) return null;
-        String[] parts = command.split(" ");
-        for (String part : parts) {
+        for (String part : command.split(" ")) {
             if (isValidPlayerName(part)) return part;
         }
         return null;

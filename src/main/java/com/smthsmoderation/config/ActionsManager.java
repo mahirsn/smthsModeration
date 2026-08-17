@@ -3,8 +3,7 @@ package com.smthsmoderation.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import com.smthsmoderation.gui.SmthsConfigScreen;
-import net.minecraft.client.gui.screen.Screen;
+
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
@@ -12,117 +11,75 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ActionsManager {
-    public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+/**
+ * Loads and persists the mod's two config files. Holds the live settings as
+ * static state (this mod only ever runs as one client instance per JVM) but
+ * does no business logic itself — see the {@code action} package for that.
+ */
+public final class ActionsManager {
+
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path ACTIONS_PATH = Path.of("config", "smthsmoderation_actions.json");
     private static final Path CONFIG_PATH = Path.of("config", "smthsmoderation_config.json");
-    public static final Type LIST_TYPE = new TypeToken<List<ModerationAction>>(){}.getType();
-    public static final Type CONFIG_TYPE = new TypeToken<ModConfig>(){}.getType();
+    private static final Type ACTIONS_LIST_TYPE = new TypeToken<List<ModerationAction>>() {}.getType();
 
     public static List<ModerationAction> actions = new ArrayList<>();
-    public static boolean modEnabled = true;
-    public static boolean enableEntityClick = true;
-    public static boolean enableChatClick = true;
-    public static boolean showHistoryButton = true;
-    public static int historyCommandLimit = 10;
-    public static boolean enableLocalLogging = true;
-    public static int logMessageCount = 30;
-    public static boolean enableWebhook = true;
-    public static String webhookUrl = "";
-    public static int webhookMessageCount = 30;
+    public static ModConfig config = new ModConfig();
 
-    public static class ModConfig {
-        public boolean modEnabled = true;
-        public boolean enableEntityClick = true;
-        public boolean enableChatClick = true;
-        public boolean showHistoryButton = true;
-        public int historyCommandLimit = 10;
-        public boolean enableLocalLogging = true;
-        public int logMessageCount = 30;
-        public boolean enableWebhook = true;
-        public String webhookUrl = "";
-        public int webhookMessageCount = 30;
+    private ActionsManager() {
     }
 
     public static void load() {
-        loadConfig();
-        try {
-            if (Files.exists(ACTIONS_PATH)) {
-                String json = Files.readString(ACTIONS_PATH);
-                List<ModerationAction> loaded = GSON.fromJson(json, LIST_TYPE);
-                if (loaded != null && !loaded.isEmpty()) {
-                    actions = loaded;
-                    return;
-                }
-            }
-        } catch (Exception ignored) {}
-        actions = createDefaults();
-        save();
+        config = readJson(CONFIG_PATH, ModConfig.class, new ModConfig());
+
+        List<ModerationAction> loaded = readJson(ACTIONS_PATH, ACTIONS_LIST_TYPE, null);
+        actions = (loaded != null && !loaded.isEmpty()) ? loaded : createDefaults();
+        if (loaded == null || loaded.isEmpty()) save();
     }
 
-    private static void loadConfig() {
-        try {
-            if (Files.exists(CONFIG_PATH)) {
-                String json = Files.readString(CONFIG_PATH);
-                ModConfig cfg = GSON.fromJson(json, CONFIG_TYPE);
-                if (cfg != null) {
-                    modEnabled = cfg.modEnabled;
-                    enableEntityClick = cfg.enableEntityClick;
-                    enableChatClick = cfg.enableChatClick;
-                    showHistoryButton = cfg.showHistoryButton;
-                    historyCommandLimit = cfg.historyCommandLimit;
-                    enableLocalLogging = cfg.enableLocalLogging;
-                    logMessageCount = cfg.logMessageCount;
-                    enableWebhook = cfg.enableWebhook;
-                    webhookUrl = cfg.webhookUrl;
-                    webhookMessageCount = cfg.webhookMessageCount;
-                    return;
-                }
-            }
-        } catch (Exception ignored) {}
-        modEnabled = true;
-        enableEntityClick = true;
-        enableChatClick = true;
-        showHistoryButton = true;
-        historyCommandLimit = 10;
-        enableLocalLogging = true;
-        logMessageCount = 30;
-        enableWebhook = true;
-        webhookUrl = "";
-        webhookMessageCount = 30;
+    public static void save() {
+        writeJson(ACTIONS_PATH, actions);
     }
 
     public static void saveConfig() {
+        writeJson(CONFIG_PATH, config);
+    }
+
+    private static <T> T readJson(Path path, Type type, T fallback) {
         try {
-            Files.createDirectories(CONFIG_PATH.getParent());
-            ModConfig cfg = new ModConfig();
-            cfg.modEnabled = modEnabled;
-            cfg.enableEntityClick = enableEntityClick;
-            cfg.enableChatClick = enableChatClick;
-            cfg.showHistoryButton = showHistoryButton;
-            cfg.historyCommandLimit = historyCommandLimit;
-            cfg.enableLocalLogging = enableLocalLogging;
-            cfg.logMessageCount = logMessageCount;
-            cfg.enableWebhook = enableWebhook;
-            cfg.webhookUrl = webhookUrl;
-            cfg.webhookMessageCount = webhookMessageCount;
-            Files.writeString(CONFIG_PATH, GSON.toJson(cfg));
-        } catch (IOException ignored) {}
+            if (Files.exists(path)) {
+                T value = GSON.fromJson(Files.readString(path), type);
+                if (value != null) return value;
+            }
+        } catch (Exception ignored) {
+            // Missing or malformed config falls back to defaults.
+        }
+        return fallback;
+    }
+
+    private static void writeJson(Path path, Object value) {
+        try {
+            Files.createDirectories(path.getParent());
+            Files.writeString(path, GSON.toJson(value));
+        } catch (IOException ignored) {
+            // Best-effort persistence; the in-memory state stays authoritative either way.
+        }
     }
 
     private static List<ModerationAction> createDefaults() {
         List<ModerationAction> list = new ArrayList<>();
 
-        ModerationAction ban = new ModerationAction("ban", "/ban %player% %duration% %reason%", 0xFFFF5555, "Oyuncuyu sunucudan uzaklaştırır.");
+        ModerationAction ban = new ModerationAction("ban", "/ban %player% %duration% %reason%", 0xFFFF5555,
+                "Oyuncuyu sunucudan uzaklaştırır.");
         ban.requiresConfirmation = true;
         ban.smartMultiplierEnabled = true;
         ban.multiplierKeyword = "yasakladı";
-        ban.reductionKeyword = "";
         ban.variables.add(new CommandVariable("reason", "hile, uygunsuz icerik, kural ihlali", false));
         ban.variables.add(new CommandVariable("duration", "1d, 7d, 30d", false));
         list.add(ban);
 
-        ModerationAction ipban = new ModerationAction("ipban", "/ipban %player% %duration% %reason%", 0xFFFF5555, "Oyuncunun IP adresini yasaklar.");
+        ModerationAction ipban = new ModerationAction("ipban", "/ipban %player% %duration% %reason%", 0xFFFF5555,
+                "Oyuncunun IP adresini yasaklar.");
         ipban.requiresConfirmation = true;
         ipban.smartMultiplierEnabled = true;
         ipban.multiplierKeyword = "yasakladı";
@@ -130,15 +87,17 @@ public class ActionsManager {
         ipban.variables.add(new CommandVariable("duration", "1h, 3h, 6h, 1d, 7d, 30d", false));
         list.add(ipban);
 
-        ModerationAction mute = new ModerationAction("mute", "/mute %player% %duration% %reason%", 0xFF555555, "Oyuncunun sohbet erişimini kapatır.");
+        ModerationAction mute = new ModerationAction("mute", "/mute %player% %duration% %reason%", 0xFF555555,
+                "Oyuncunun sohbet erişimini kapatır.");
         mute.smartMultiplierEnabled = true;
         mute.multiplierKeyword = "susturdu";
-        mute.reductionKeyword = "";
         mute.variables.add(new CommandVariable("reason", "spam, küfür, argo, hakaret", false));
         mute.variables.add(new CommandVariable("duration", "30m, 1h, 6h, 1d, 7d, 30d", false));
         list.add(mute);
 
-        ModerationAction voiceMute = new ModerationAction("voice mute", "/lp user %player% permission settemp voicechat.speak false %duration%", 0xFF555555, "Oyuncunun sesli sohbet yetkisini süreli olarak alır.");
+        ModerationAction voiceMute = new ModerationAction("voice mute",
+                "/lp user %player% permission settemp voicechat.speak false %duration%", 0xFF555555,
+                "Oyuncunun sesli sohbet yetkisini süreli olarak alır.");
         voiceMute.variables.add(new CommandVariable("duration", "1h, 3h, 6h, 1d, 7d, 30d", false));
         list.add(voiceMute);
 
@@ -148,16 +107,5 @@ public class ActionsManager {
         list.add(new ModerationAction("axir view", "/axir view %player%", 0xFF555555, "Oyuncunun ceza geçmişini görüntüler."));
 
         return list;
-    }
-
-    public static void save() {
-        try {
-            Files.createDirectories(ACTIONS_PATH.getParent());
-            Files.writeString(ACTIONS_PATH, GSON.toJson(actions));
-        } catch (IOException ignored) {}
-    }
-
-    public static Screen buildScreen(Screen parent) {
-        return SmthsConfigScreen.build(parent);
     }
 }

@@ -1,363 +1,90 @@
 package com.smthsmoderation.gui;
 
 import com.smthsmoderation.config.ActionsManager;
-import com.smthsmoderation.config.CommandVariable;
 import com.smthsmoderation.config.ModerationAction;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
-import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
-import me.shedaniel.clothconfig2.gui.AbstractConfigScreen;
-import me.shedaniel.clothconfig2.gui.ClothConfigScreen;
-import me.shedaniel.clothconfig2.gui.entries.SubCategoryListEntry;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.text.Text;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 
-import java.util.HashMap;
-import java.util.Map;
-
+/**
+ * Settings screen (ModMenu / Cloth Config). Organized like a typical
+ * multi-category Cloth Config mod: one flat, colored tab per concern
+ * (General / Local Logging / Discord Webhook / Actions) with only native
+ * Cloth Config widgets — no hand-rolled bevel widgets. The dynamic list of
+ * moderation actions isn't a settings tree; each action is a row here that
+ * opens its own dedicated {@link ActionEditorScreen}, the same way you'd
+ * open a separate editor for one item in a list rather than nesting it.
+ */
 public class SmthsConfigScreen {
 
-    private static final int GREEN = 0xFF55FF55;
-    private static final int RED = 0xFFFF7777;
-    private static final Map<String, Boolean> expandedStates = new HashMap<>();
+    static final int GREEN = 0xFF55FF55;
+    static final int RED = 0xFFFF7777;
 
     public static Screen build(Screen parent) {
         ConfigBuilder builder = ConfigBuilder.create()
-            .setParentScreen(parent)
-            .setTitle(Text.literal("§bSmthsModeration Config"))
-            .transparentBackground()
-            .setSavingRunnable(() -> { ActionsManager.save(); })
-            .setDoesConfirmSave(true);
+                .setParentScreen(parent)
+                .setTitle(Component.literal("SmthsModeration"))
+                .transparentBackground()
+                .setSavingRunnable(ActionsManager::save);
 
-        ConfigCategory main = builder.getOrCreateCategory(Text.literal("Moderation Actions"));
+        var config = ActionsManager.config;
+        var entries = ConfigEntryBuilder.create();
 
-        main.addEntry(ConfigEntryBuilder.create()
-            .startBooleanToggle(Text.literal("§6§lEnable Mod"), ActionsManager.modEnabled)
-            .setDefaultValue(true)
-            .setSaveConsumer(v -> {
-                ActionsManager.modEnabled = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
+        var general = builder.getOrCreateCategory(Component.literal("General").withStyle(ChatFormatting.AQUA));
+        general.addEntry(entries.startBooleanToggle(Component.literal("Enable Mod"), config.modEnabled)
+                .setSaveConsumer(v -> { config.modEnabled = v; ActionsManager.saveConfig(); })
+                .build());
+        general.addEntry(entries.startBooleanToggle(Component.literal("Shift+Right-Click on Players"), config.enableEntityClick)
+                .setSaveConsumer(v -> { config.enableEntityClick = v; ActionsManager.saveConfig(); })
+                .build());
+        general.addEntry(entries.startBooleanToggle(Component.literal("Shift+Click in Chat"), config.enableChatClick)
+                .setSaveConsumer(v -> { config.enableChatClick = v; ActionsManager.saveConfig(); })
+                .build());
+        general.addEntry(entries.startBooleanToggle(Component.literal("Show History Button"), config.showHistoryButton)
+                .setSaveConsumer(v -> { config.showHistoryButton = v; ActionsManager.saveConfig(); })
+                .build());
+        general.addEntry(entries.startIntField(Component.literal("History Command Limit"), config.historyCommandLimit)
+                .setMin(1).setMax(100)
+                .setSaveConsumer(v -> { config.historyCommandLimit = v; ActionsManager.saveConfig(); })
+                .build());
 
-        main.addEntry(ConfigEntryBuilder.create()
-            .startBooleanToggle(Text.literal("§fEnable Shift+Right-Click on Players"), ActionsManager.enableEntityClick)
-            .setDefaultValue(true)
-            .setSaveConsumer(v -> {
-                ActionsManager.enableEntityClick = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
+        var logging = builder.getOrCreateCategory(Component.literal("Local Logging").withStyle(ChatFormatting.GRAY));
+        logging.addEntry(entries.startBooleanToggle(Component.literal("Enable Local Logging"), config.enableLocalLogging)
+                .setSaveConsumer(v -> { config.enableLocalLogging = v; ActionsManager.saveConfig(); })
+                .build());
+        logging.addEntry(entries.startIntField(Component.literal("Logged Message Count"), config.logMessageCount)
+                .setMin(5).setMax(200)
+                .setSaveConsumer(v -> { config.logMessageCount = v; ActionsManager.saveConfig(); })
+                .build());
 
-        main.addEntry(ConfigEntryBuilder.create()
-            .startBooleanToggle(Text.literal("§fEnable Shift+Left-Click in Chat"), ActionsManager.enableChatClick)
-            .setDefaultValue(true)
-            .setSaveConsumer(v -> {
-                ActionsManager.enableChatClick = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
+        var webhook = builder.getOrCreateCategory(Component.literal("Discord Webhook").withStyle(ChatFormatting.LIGHT_PURPLE));
+        webhook.addEntry(entries.startBooleanToggle(Component.literal("Enable Webhook"), config.enableWebhook)
+                .setTooltip(Component.literal("Send moderation embeds to a Discord webhook."))
+                .setSaveConsumer(v -> { config.enableWebhook = v; ActionsManager.saveConfig(); })
+                .build());
+        webhook.addEntry(entries.startStrField(Component.literal("Webhook URL"), config.webhookUrl)
+                .setTooltip(Component.literal("Paste your Discord webhook URL here. Leave empty to disable webhook posting."))
+                .setSaveConsumer(v -> { config.webhookUrl = v; ActionsManager.saveConfig(); })
+                .build());
+        webhook.addEntry(entries.startIntField(Component.literal("Webhook Message Count"), config.webhookMessageCount)
+                .setMin(5).setMax(50)
+                .setTooltip(Component.literal("Number of recent chat messages included in the webhook embed."))
+                .setSaveConsumer(v -> { config.webhookMessageCount = v; ActionsManager.saveConfig(); })
+                .build());
 
-        main.addEntry(ConfigEntryBuilder.create()
-            .startBooleanToggle(Text.literal("§fShow History Button"), ActionsManager.showHistoryButton)
-            .setDefaultValue(true)
-            .setSaveConsumer(v -> {
-                ActionsManager.showHistoryButton = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
-
-        main.addEntry(ConfigEntryBuilder.create()
-            .startIntField(Text.literal("§fHistory Command Limit"), ActionsManager.historyCommandLimit)
-            .setDefaultValue(10)
-            .setMin(1)
-            .setMax(100)
-            .setSaveConsumer(v -> {
-                ActionsManager.historyCommandLimit = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
-
-        main.addEntry(ConfigEntryBuilder.create()
-            .startTextDescription(Text.literal("§7Highly Customizable Command Executer (designed for moderation)"))
-            .build());
-
-        var loggingSub = ConfigEntryBuilder.create()
-            .startSubCategory(Text.literal("§3Local Logging"));
-        loggingSub.setExpanded(expandedStates.getOrDefault("Local Logging", false));
-
-        loggingSub.add(ConfigEntryBuilder.create()
-            .startBooleanToggle(Text.literal("Enable Local Logging"), ActionsManager.enableLocalLogging)
-            .setDefaultValue(true)
-            .setSaveConsumer(v -> {
-                ActionsManager.enableLocalLogging = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
-
-        loggingSub.add(ConfigEntryBuilder.create()
-            .startIntField(Text.literal("Logged Message Count"), ActionsManager.logMessageCount)
-            .setDefaultValue(30)
-            .setMin(5)
-            .setMax(200)
-            .setSaveConsumer(v -> {
-                ActionsManager.logMessageCount = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
-
-        main.addEntry(loggingSub.build());
-
-        var webhookSub = ConfigEntryBuilder.create()
-            .startSubCategory(Text.literal("§5Discord Webhook"));
-        webhookSub.setExpanded(expandedStates.getOrDefault("Discord Webhook", false));
-
-        webhookSub.add(ConfigEntryBuilder.create()
-            .startBooleanToggle(Text.literal("§fEnable Webhook"), ActionsManager.enableWebhook)
-            .setDefaultValue(true)
-            .setTooltip(Text.literal("§7Send moderation embeds to a Discord webhook."))
-            .setSaveConsumer(v -> {
-                ActionsManager.enableWebhook = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
-
-        webhookSub.add(ConfigEntryBuilder.create()
-            .startStrField(Text.literal("§fCustom Webhook URL"), ActionsManager.webhookUrl)
-            .setDefaultValue("")
-            .setTooltip(Text.literal("§7Paste your Discord webhook URL here.\n§7Leave empty for Blocksmiths default."))
-            .setSaveConsumer(v -> {
-                ActionsManager.webhookUrl = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
-
-        webhookSub.add(ConfigEntryBuilder.create()
-            .startIntField(Text.literal("§fWebhook Message Count"), ActionsManager.webhookMessageCount)
-            .setDefaultValue(30)
-            .setMin(5)
-            .setMax(50)
-            .setTooltip(Text.literal("§7Number of recent chat messages included\n§7in the webhook embed."))
-            .setSaveConsumer(v -> {
-                ActionsManager.webhookMessageCount = v;
-                ActionsManager.saveConfig();
-            })
-            .build());
-
-        main.addEntry(webhookSub.build());
-
-        main.addEntry(new ButtonEntry(Text.literal("[Save Config]"), GREEN, () -> {
-            Screen current = MinecraftClient.getInstance().currentScreen;
-            if (current instanceof AbstractConfigScreen acs) {
-                acs.saveAll(false);
-            }
-            ActionsManager.save();
-        }));
-
-        main.addEntry(new ButtonEntry(Text.literal("[+] Add New Action"), GREEN, () -> {
-            String uniqueName = "New-" + System.nanoTime();
-            ActionsManager.actions.add(new ModerationAction(uniqueName, "/command %player%", 0xFF555555, "New action"));
-            rebuild(parent);
-        }));
-
+        var actions = builder.getOrCreateCategory(Component.literal("Actions").withStyle(ChatFormatting.GOLD));
         for (ModerationAction action : ActionsManager.actions) {
-            var actionSub = ConfigEntryBuilder.create()
-                .startSubCategory(Text.literal(action.type));
-            actionSub.setExpanded(expandedStates.getOrDefault(action.type, false));
-
-            actionSub.add(ConfigEntryBuilder.create()
-                .startStrField(Text.literal("Action Name"), action.type)
-                .setDefaultValue("MyAction")
-                .setSaveConsumer(v -> {
-                    action.type = v;
-                    rebuild(parent);
-                })
-                .build()
-            );
-
-            actionSub.add(ConfigEntryBuilder.create()
-                .startStrField(Text.literal("Command Template"), action.commandTemplate)
-                .setDefaultValue("/" + action.type.toLowerCase() + " %player% %reason%")
-                .setSaveConsumer(v -> action.commandTemplate = v)
-                .build()
-            );
-
-            String hex = String.format("#%06X", 0xFFFFFF & action.buttonColor);
-            actionSub.add(ConfigEntryBuilder.create()
-                .startStrField(Text.literal("Button Color (hex)"), hex)
-                .setDefaultValue("#8B0000")
-                .setSaveConsumer(v -> {
-                    try {
-                        action.buttonColor = 0xFF000000 | Integer.parseInt(v.replace("#", "").trim(), 16);
-                    } catch (NumberFormatException ignored) {}
-                })
-                .build()
-            );
-
-            actionSub.add(ConfigEntryBuilder.create()
-                .startStrField(Text.literal("Description"), action.description)
-                .setDefaultValue("")
-                .setSaveConsumer(v -> action.description = v)
-                .build()
-            );
-
-            actionSub.add(ConfigEntryBuilder.create()
-                .startBooleanToggle(Text.literal("Requires Confirmation"), action.requiresConfirmation)
-                .setDefaultValue(false)
-                .setSaveConsumer(v -> action.requiresConfirmation = v)
-                .build()
-            );
-
-            actionSub.add(ConfigEntryBuilder.create()
-                .startBooleanToggle(Text.literal("§5Send to Webhook"), action.sendWebhook)
-                .setDefaultValue(true)
-                .setTooltip(Text.literal("§7Send this action's execution to Discord webhook."))
-                .setSaveConsumer(v -> action.sendWebhook = v)
-                .build()
-            );
-
-            // Penalty Multiplier sub-category
-            var smartSub = ConfigEntryBuilder.create()
-                .startSubCategory(Text.literal("§6Penalty Multiplier"));
-            smartSub.setExpanded(expandedStates.getOrDefault("PM: " + action.type, false));
-
-            smartSub.add(ConfigEntryBuilder.create()
-                .startBooleanToggle(Text.literal("Enable Multiplier"), action.smartMultiplierEnabled)
-                .setDefaultValue(false)
-                .setSaveConsumer(v -> action.smartMultiplierEnabled = v)
-                .build()
-            );
-
-            smartSub.add(ConfigEntryBuilder.create()
-                .startStrField(Text.literal("Keyword (e.g. muted)"), action.multiplierKeyword)
-                .setDefaultValue("")
-                .setSaveConsumer(v -> action.multiplierKeyword = v)
-                .build()
-            );
-
-            smartSub.add(ConfigEntryBuilder.create()
-                .startStrField(Text.literal("Base Penalty Time (e.g. 30m)"), action.basePenaltyTime)
-                .setDefaultValue("30m")
-                .setSaveConsumer(v -> action.basePenaltyTime = v)
-                .build()
-            );
-
-            smartSub.add(ConfigEntryBuilder.create()
-                .startDoubleField(Text.literal("Multiplier Step (per infraction)"), action.multiplierStep)
-                .setDefaultValue(0.20)
-                .setMin(0.01)
-                .setMax(10.0)
-                .setSaveConsumer(v -> action.multiplierStep = v)
-                .build()
-            );
-
-            smartSub.add(ConfigEntryBuilder.create()
-                .startDoubleField(Text.literal("Max Multiplier"), action.multiplierMax)
-                .setDefaultValue(3.0)
-                .setMin(1.0)
-                .setMax(100.0)
-                .setSaveConsumer(v -> action.multiplierMax = v)
-                .build()
-            );
-
-            smartSub.add(ConfigEntryBuilder.create()
-                .startStrField(Text.literal("Reduction Keyword (e.g. kaldırdı)"), action.reductionKeyword)
-                .setDefaultValue("kaldırdı")
-                .setSaveConsumer(v -> action.reductionKeyword = v)
-                .build()
-            );
-
-            smartSub.add(ConfigEntryBuilder.create()
-                .startStrField(Text.literal("Target Variable for PM"), action.targetVariableForPM)
-                .setDefaultValue("duration")
-                .setSaveConsumer(v -> action.targetVariableForPM = v)
-                .build()
-            );
-
-            actionSub.add(smartSub.build());
-
-            for (int i = 0; i < action.variables.size(); i++) {
-                CommandVariable var = action.variables.get(i);
-                int vi = i;
-
-                var varSub = ConfigEntryBuilder.create()
-                    .startSubCategory(Text.literal("Variable: " + var.name));
-                varSub.setExpanded(expandedStates.getOrDefault("Variable: " + var.name, false));
-
-                varSub.add(ConfigEntryBuilder.create()
-                    .startStrField(Text.literal("Name"), var.name)
-                    .setDefaultValue("var")
-                    .setSaveConsumer(v -> var.name = v)
-                    .build()
-                );
-
-                varSub.add(ConfigEntryBuilder.create()
-                    .startStrField(Text.literal("Presets (CSV)"), var.presets)
-                    .setDefaultValue("")
-                    .setSaveConsumer(v -> var.presets = v)
-                    .build()
-                );
-
-                varSub.add(ConfigEntryBuilder.create()
-                    .startBooleanToggle(Text.literal("Required"), var.isRequired)
-                    .setDefaultValue(false)
-                    .setSaveConsumer(v -> var.isRequired = v)
-                    .build()
-                );
-
-                varSub.add(new ButtonEntry(Text.literal("[-] Remove Variable"), RED, () -> {
-                    action.variables.remove(vi);
-                    rebuild(parent);
-                }));
-
-                actionSub.add(varSub.build());
-            }
-
-            actionSub.add(new DualButtonEntry(
-                Text.literal("[+] Add Custom Variable"), GREEN, () -> {
-                    String varName = "new_var" + (action.variables.size() + 1);
-                    action.variables.add(new CommandVariable(varName, "", false));
-                    rebuild(parent);
-                },
-                Text.literal("[-] Delete Action"), RED, () -> {
-                    ActionsManager.actions.remove(action);
-                    rebuild(parent);
-                }
-            ));
-
-            main.addEntry(actionSub.build());
+            actions.addEntry(new ButtonEntry(Component.literal(action.type), action.getColor(), () ->
+                    Minecraft.getInstance().gui.setScreen(ActionEditorScreen.build(Minecraft.getInstance().gui.screen(), parent, action))));
         }
+        actions.addEntry(new ButtonEntry(Component.literal("+ Add New Action"), GREEN, () -> {
+            ActionsManager.actions.add(new ModerationAction("New-" + System.nanoTime(), "/command %player%", 0xFF555555, ""));
+            Minecraft.getInstance().gui.setScreen(build(parent));
+        }));
 
         return builder.build();
-    }
-
-    private static void saveExpandedState(Screen screen) {
-        if (screen instanceof ClothConfigScreen clothScreen && clothScreen.listWidget != null) {
-            expandedStates.clear();
-            for (Element entry : clothScreen.listWidget.children()) {
-                if (entry instanceof SubCategoryListEntry sub) {
-                    expandedStates.put(sub.getCategoryName().getString(), sub.isExpanded());
-                    for (Element subEntry : sub.children()) {
-                        if (subEntry instanceof SubCategoryListEntry nestedSub) {
-                            expandedStates.put(nestedSub.getCategoryName().getString(), nestedSub.isExpanded());
-                            // Handle 3rd level (Penalty Multiplier inside action)
-                            for (Element nestedSubEntry : nestedSub.children()) {
-                                if (nestedSubEntry instanceof SubCategoryListEntry thirdLevel) {
-                                    expandedStates.put(thirdLevel.getCategoryName().getString(), thirdLevel.isExpanded());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private static void rebuild(Screen parent) {
-        Screen current = MinecraftClient.getInstance().currentScreen;
-        saveExpandedState(current);
-        MinecraftClient.getInstance().setScreen(build(parent));
     }
 }
