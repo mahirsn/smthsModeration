@@ -59,7 +59,13 @@ public class SmthsmoderationModClient implements ClientModInitializer {
             Player target = (Player) entity;
             String name = target.getGameProfile().name();
             Minecraft.getInstance().gui.setScreen(new ModerationScreen(name, target.getUUID()));
-            return InteractionResult.SUCCESS;
+            // FAIL, not SUCCESS: per UseEntityCallback's contract SUCCESS still
+            // sends the interaction packet, so the server also opened a trade
+            // behind the moderation screen. FAIL is the only return that keeps
+            // the packet on the client. (CONSUME sends it too, just without the
+            // hand swing.) The pre-26 ActionResult.SUCCESS did not send one,
+            // which is why this only broke after the port.
+            return InteractionResult.FAIL;
         });
     }
 
