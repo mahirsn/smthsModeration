@@ -4,10 +4,10 @@ import com.smthsmoderation.config.ActionsManager;
 import com.smthsmoderation.gui.ModerationScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ChatScreen;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.Style;
-import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -36,10 +36,16 @@ public class ChatScreenMixin {
         }
     }
 
+    /**
+     * 26.3 swapped GLFW for SDL, so the old glfwGetKey(windowHandle, ...) is
+     * gone along with the whole org.lwjgl.glfw package. InputConstants is
+     * Mojang's own wrapper over whichever backend is in use and no longer
+     * wants a window handle, which is also why it survives the swap.
+     * Screen.hasShiftDown() would read better but does not exist here.
+     */
     private boolean isShiftDown() {
-        long handle = Minecraft.getInstance().getWindow().handle();
-        return GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS
-                || GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
+        return InputConstants.isKeyDown(InputConstants.KEY_LSHIFT)
+                || InputConstants.isKeyDown(InputConstants.KEY_RSHIFT);
     }
 
     private String extractPlayerName(Style style) {

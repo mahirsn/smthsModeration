@@ -39,7 +39,7 @@ public class SmthsmoderationModClient implements ClientModInitializer {
     private void registerKeybind() {
         KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("smthsmoderation", "general"));
         KeyMapping openKey = KeyMappingHelper.registerKeyMapping(
-                new KeyMapping(KEY_TRANSLATION, InputConstants.Type.KEYSYM, InputConstants.KEY_K, category));
+                new KeyMapping(KEY_TRANSLATION, InputConstants.Type.KEYBOARD, InputConstants.KEY_K, category));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openKey.consumeClick()) {

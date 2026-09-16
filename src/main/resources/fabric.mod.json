@@ -1,32 +1,32 @@
 {
-    "schemaVersion": 1,
-    "id": "smthsmoderation",
-    "version": "${version}",
-    "name": "Smthsmoderation",
-    "description": "Highly Customizable Command Executer (designed for moderation)",
-    "authors": [
-        "smthsmoderation"
+  "schemaVersion": 1,
+  "id": "smthsmoderation",
+  "version": "${version}",
+  "name": "Smthsmoderation",
+  "description": "Highly Customizable Command Executer (designed for moderation)",
+  "authors": [
+    "smthsmoderation"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/smthsmoderation/logo.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.smthsmoderation.SmthsmoderationModClient"
     ],
-    "contact": {},
-    "license": "MIT",
-    "icon": "assets/smthsmoderation/logo.png",
-    "environment": "client",
-    "entrypoints": {
-        "client": [
-            "com.smthsmoderation.SmthsmoderationModClient"
-        ],
-        "modmenu": [
-            "com.smthsmoderation.config.ModMenuIntegration"
-        ]
-    },
-    "mixins": [
-        "smthsmoderation.mixins.json"
-    ],
-    "depends": {
-        "fabricloader": ">=0.19.3",
-        "minecraft": "~26.2",
-        "java": ">=25",
-        "fabric-api": "*",
-        "cloth-config2": ">=26.2.155"
-    }
+    "modmenu": [
+      "com.smthsmoderation.config.ModMenuIntegration"
+    ]
+  },
+  "mixins": [
+    "smthsmoderation.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.3",
+    "java": ">=25",
+    "fabric-api": "*",
+    "cloth-config2": ">=26.3.158"
+  }
 }
