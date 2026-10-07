@@ -64,6 +64,9 @@ public class ModerationScreen extends Screen {
     private int leftX;
     private int rightX;
     private int topY;
+    // Grows past PANEL_HEIGHT when the left column needs it: more actions wrap
+    // onto more rows, and the panels have to reach the last one.
+    private int panelHeight = PANEL_HEIGHT;
     private int historyLogTop;
 
     public ModerationScreen(String playerName, UUID playerUuid) {
@@ -82,7 +85,6 @@ public class ModerationScreen extends Screen {
     protected void init() {
         leftX = (this.width - (COLUMN_WIDTH * 2 + COLUMN_GAP)) / 2;
         rightX = leftX + COLUMN_WIDTH + COLUMN_GAP;
-        topY = (this.height - PANEL_HEIGHT) / 2;
 
         rebuildLeftColumn();
     }
@@ -98,8 +100,8 @@ public class ModerationScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         graphics.fill(0, 0, this.width, this.height, 0x80000000);
-        GuiUtil.drawPanel(graphics, leftX, topY, COLUMN_WIDTH, PANEL_HEIGHT);
-        GuiUtil.drawPanel(graphics, rightX, topY, COLUMN_WIDTH, PANEL_HEIGHT);
+        GuiUtil.drawPanel(graphics, leftX, topY, COLUMN_WIDTH, panelHeight);
+        GuiUtil.drawPanel(graphics, rightX, topY, COLUMN_WIDTH, panelHeight);
 
         graphics.blit(RenderPipelines.GUI_TEXTURED, PlayerSkins.resolve(playerUuid), leftX + PADDING, topY + PADDING, 8, 8, 20, 20, 8, 8, 64, 64);
         graphics.text(this.font, playerName, leftX + PADDING + 28, topY + PADDING + 5, GuiUtil.TEXT_PRIMARY, false);
@@ -138,6 +140,20 @@ public class ModerationScreen extends Screen {
     // --- Left column: header, actions, variables, execute, history button ---
 
     private void rebuildLeftColumn() {
+        // Lay out once to measure the column, then again with the panels sized
+        // and centred for it. The second pass ends at the same height.
+        topY = (this.height - panelHeight) / 2;
+        int bottom = layoutLeftColumn();
+        int needed = Math.max(PANEL_HEIGHT, bottom - topY + PADDING);
+        if (needed != panelHeight) {
+            panelHeight = needed;
+            topY = (this.height - panelHeight) / 2;
+            layoutLeftColumn();
+        }
+    }
+
+    /** Places the left column's widgets from topY and returns where it ends. */
+    private int layoutLeftColumn() {
         leftDynamicWidgets.forEach(this::removeWidget);
         leftDynamicWidgets.clear();
         varFields.clear();
@@ -167,10 +183,12 @@ public class ModerationScreen extends Screen {
         if (ActionsManager.config.showHistoryButton) {
             addWidget(new ActionButton(this.font, leftX + PADDING, y, COLUMN_WIDTH - PADDING * 2, 18,
                     Component.literal("Show History"), GuiUtil.SURFACE, this::requestHistory), y, 18);
+            y += 18;
         }
 
         historyLogTop = topY + PADDING + 20;
         updateExecuteButtonState();
+        return y;
     }
 
     private int separator(int y, int gapAfter) {
